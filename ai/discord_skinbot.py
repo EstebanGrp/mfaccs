@@ -323,6 +323,10 @@ def in_channel(i) -> bool:
 
 @bot.event
 async def on_ready():
+    # registrar la vista persistente: sin esto, los botones de paneles
+    # enviados ANTES de un reinicio (como el de Actions cada ~6h) mueren
+    # con "The application did not respond"
+    bot.add_view(PanelView())
     await tree.sync()
     warn(f"SkinBot listo como {bot.user} — repo {REPO}@{BRANCH}")
     warn(f"canal autorizado: {CHANNEL_ID or '(todos)'} | admins: {len(ADMINS) or '(todos)'}")
