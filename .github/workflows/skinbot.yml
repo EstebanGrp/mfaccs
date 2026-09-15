@@ -35,12 +35,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350      # 5h50m — GitHub corta a 6h de todos modos
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-          cache: pip
 
       - name: Instalar dependencias
         run: pip install discord.py requests
