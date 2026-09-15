@@ -1,9 +1,9 @@
 {
-  "$note": "Mapa jugador → skin custom. Clave = uuid (preferido, inmune a renombres) o username. Campo 'skin' puede ser: (1) id custom:mf_<pack> o custom:mf_dev_<png> (resuelto por el client), (2) ruta a /skins/ sin/con .png (devs/itzesteban), (3) nombre de skin vanilla (chris), (4) URL absoluta https://... / chrome-extension://... / file://... / data:image/... / blob:... (el juego la carga con loadSkinFromUrl). Este archivo se sirve con la extensión; la DB builtin de CustomSkins.js ya incluye la mayoría — edita/añade aquí para extender sin tocar código.",
+  "$note": "Mapa jugador \u2192 skin custom. Clave = uuid (preferido, inmune a renombres) o username. Campo 'skin' puede ser: (1) id custom:mf_<pack> o custom:mf_dev_<png> (resuelto por el client), (2) ruta a /skins/ sin/con .png (devs/itzesteban), (3) nombre de skin vanilla (chris), (4) URL absoluta https://... / chrome-extension://... / file://... / data:image/... / blob:... (el juego la carga con loadSkinFromUrl). Este archivo se sirve con la extensi\u00f3n; la DB builtin de CustomSkins.js ya incluye la mayor\u00eda \u2014 edita/a\u00f1ade aqu\u00ed para extender sin tocar c\u00f3digo.",
   "$example_url": "https://raw.githubusercontent.com/MiniFeatherClient/skins/main/users/shusukegxe.png",
   "players": {
     "6eb7369a-551e-406a-9a63-6db7a358e1e5": {
-      "skin": "custom:mf_shusukegxe"
+      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe.png"
     },
     "c4201f43-2de9-4275-930a-301fae4cce6c": {
       "skin": "custom:mf_angrywolfx"
@@ -12,7 +12,7 @@
       "skin": "custom:mf_angrywolfx"
     },
     "shusukegxe": {
-      "skin": "custom:mf_shusukegxe"
+      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe.png"
     },
     "shusukegxe_": {
       "skin": "https://www.minecraftskins.com/uploads/skins/2026/09/11/pluckyape1320-png-24332353.png?v971"
