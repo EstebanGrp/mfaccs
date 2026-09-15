@@ -71,6 +71,8 @@ ACCOUNTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mf_acc
 
 GH_API = f"https://api.github.com/repos/{REPO}"
 RAW_URL = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{ACCOUNTS_PATH}"
+SKINS_DIR = "skins"  # repo público: mfaccs/skins/<user>.png
+SKINS_RAW = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{SKINS_DIR}"
 
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 SKIN_RE = re.compile(r"^[a-z0-9_]+$", re.I)
@@ -129,6 +131,27 @@ def gh_upload(data, sha, msg):
     if r.status_code not in (200, 201):
         raise RuntimeError(f"GitHub {r.status_code}: {r.text[:300]}")
     return r.json().get("commit", {}).get("html_url", "")
+
+
+def gh_upload_png(user, png_bytes):
+    """Sube skins/<user>.png al repo público. Devuelve la URL raw."""
+    path = f"{SKINS_DIR}/{user}.png"
+    # sha previo si ya existía (para reemplazo)
+    sha = None
+    r = requests.get(f"{GH_API}/contents/{path}?ref={BRANCH}", headers=gh_headers(), timeout=15)
+    if r.status_code == 200:
+        sha = r.json().get("sha")
+    payload = {
+        "message": f"skin upload: {user}",
+        "content": base64.b64encode(png_bytes).decode("ascii"),
+        "branch": BRANCH,
+    }
+    if sha:
+        payload["sha"] = sha
+    r = requests.put(f"{GH_API}/contents/{path}", headers=gh_headers(), json=payload, timeout=30)
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"GitHub {r.status_code}: {r.text[:300]}")
+    return f"{SKINS_RAW}/{user}.png"
 
 
 def validate_skin_value(value):
@@ -422,6 +445,56 @@ async def skin_cmd(interaction: discord.Interaction,
 
     except Exception as e:
         warn("comando falló:", repr(e))
+        try:
+            await interaction.followup.send(f"Error: {e}")
+        except Exception:
+            pass
+
+
+@tree.command(name="skinupload", description="Upload your own skin PNG — it becomes your in-game skin")
+@app_commands.describe(image="Square or 2:1 PNG skin file (64-2048px, power of 2)")
+async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attachment):
+    if not in_channel(interaction):
+        await interaction.response.send_message("Unauthorized channel.", ephemeral=True)
+        return
+    # público: cualquiera del canal puede subir la SUYA (requiere cuenta vinculada)
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        # 1. debe tener cuenta MiniFeather vinculada
+        did = str(interaction.user.id)
+        recs = load_local_accounts().get("cuentas", {})
+        mine = [u for u, r in recs.items() if r.get("discord_id") == did]
+        if not mine:
+            await interaction.followup.send(
+                "You need a MiniFeather account first — use the panel's **Create account** button."
+            )
+            return
+        user = mine[0]
+
+        # 2. validar el archivo
+        if (image.content_type or "").lower() not in ("image/png",):
+            await interaction.followup.send("File must be a PNG.")
+            return
+        if image.size > 16 * 1024 * 1024:
+            await interaction.followup.send("Max 16 MB.")
+            return
+        png = await image.read()
+
+        # 3. subir a mfaccs/skins/<user>.png y setear la URL como skin
+        raw_url = gh_upload_png(user, png)
+        data, sha = gh_download()
+        if data is None:
+            await interaction.followup.send("Remote accounts.json corrupt.")
+            return
+        data.setdefault("players", {})[user] = {"skin": raw_url}
+        commit = gh_upload(data, sha, f"skinbot: skinupload {user}")
+        await interaction.followup.send(
+            f"Skin uploaded — `{user}` → `{raw_url}`\nVisible in-game in ≤5 min.\n{commit}"
+        )
+
+    except Exception as e:
+        warn("skinupload falló:", repr(e))
         try:
             await interaction.followup.send(f"Error: {e}")
         except Exception:
@@ -760,7 +833,9 @@ PANEL_EMBED = discord.Embed(
     description=(
         "Create your MiniFeather account (password-protected, linked to your Discord) "
         "and choose the skin others will see in-game.\n\n"
-        "**Skin formats:**\n"
+        "**Upload your own skin:** use `/skinupload` with a PNG attached "
+        "(square or 2:1, 64–2048px).\n\n"
+        "**Skin formats (Set skin):**\n"
         "`custom:mf_...` — client custom id\n"
         "`chris`, `bob` — Miniblox vanilla\n"
         "`devs/itzesteban` — pack path\n"
