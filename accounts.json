@@ -1,6 +1,4 @@
 {
-  "$note": "Mapa jugador → skin custom. Clave = uuid (preferido, inmune a renombres) o username. Campo 'skin' puede ser: (1) id custom:mf_<pack> o custom:mf_dev_<png> (resuelto por el client), (2) ruta a /skins/ sin/con .png (devs/itzesteban), (3) nombre de skin vanilla (chris), (4) URL absoluta https://... / chrome-extension://... / file://... / data:image/... / blob:... (el juego la carga con loadSkinFromUrl). Este archivo se sirve con la extensión; la DB builtin de CustomSkins.js ya incluye la mayoría — edita/añade aquí para extender sin tocar código.",
-  "$example_url": "https://raw.githubusercontent.com/MiniFeatherClient/skins/main/users/shusukegxe.png",
   "players": {
     "6eb7369a-551e-406a-9a63-6db7a358e1e5": {
       "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe.png"
