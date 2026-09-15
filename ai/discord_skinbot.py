@@ -154,6 +154,32 @@ def gh_upload_png(user, png_bytes):
     return f"{SKINS_RAW}/{user}.png"
 
 
+EXTERNAL_RE = re.compile(r"^https?://(?!raw\.githubusercontent\.com)", re.I)
+
+
+def rehost_external_skin(user, url):
+    """Descarga un PNG de una URL externa (minecraftskins.com, etc.) y lo
+    re-sube al repo propio. Así el client lo carga desde raw.githubusercontent
+    (que SÍ permite CORS) en vez de chocar con el hotlink-block del origen.
+    Devuelve la URL raw, o None si la descarga falló."""
+    try:
+        r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0 (skinbot)"})
+        if r.status_code != 200:
+            warn(f"rehost: HTTP {r.status_code} para {url[:80]}")
+            return None
+        png = r.content
+        if not png.startswith(b"\x89PNG"):
+            warn(f"rehost: no es PNG ({len(png)} bytes) para {url[:80]}")
+            return None
+        if len(png) > 16 * 1024 * 1024:
+            warn(f"rehost: PNG demasiado grande ({len(png)} bytes)")
+            return None
+        return gh_upload_png(user, png)
+    except Exception as e:
+        warn("rehost falló:", repr(e))
+        return None
+
+
 def validate_skin_value(value):
     """Mismas reglas que normalizeSkinValue de CustomSkins.js."""
     v = (value or "").strip()
@@ -417,12 +443,24 @@ async def skin_cmd(interaction: discord.Interaction,
                 if not ok:
                     await interaction.followup.send(f"Skin inválida ({why}).")
                     return
+            # re-host de URLs externas (CORS desde miniblox.io)
+            rehosted = False
+            if EXTERNAL_RE.match(value):
+                raw = rehost_external_skin(key, value)
+                if raw:
+                    value, rehosted = raw, True
+                else:
+                    await interaction.followup.send(
+                        "No pude descargar esa imagen (¿es un link directo a PNG?). "
+                        "Sube el archivo con /skinupload.")
+                    return
             old = players.get(key, {}).get("skin")
             players[key] = {"skin": value}
             commit = gh_upload(data, sha, f"skinbot: set {key} = {value[:40]}")
             oldinfo = f" (antes: `{old}`)" if old and old != value else ""
+            rh = "\nRe-hosteada en nuestro repo (sin CORS)." if rehosted else ""
             await interaction.followup.send(
-                f"OK — `{key}` ({kdisp}) → `{value}`{oldinfo}\n{commit}")
+                f"OK — `{key}` ({kdisp}) → `{value}`{oldinfo}{rh}\n{commit}")
 
         elif act == "list":
             data, _sha = gh_download()
@@ -758,9 +796,23 @@ class SetSkinModal(discord.ui.Modal, title="Choose skin for your account"):
                 ephemeral=True)
             return
         try:
+            # URLs externas (minecraftskins.com, etc.) bloquean CORS desde
+            # miniblox.io → re-host en nuestro repo antes de guardar
+            rehosted = False
+            if EXTERNAL_RE.match(value):
+                await interaction.response.defer(ephemeral=True)
+                raw = rehost_external_skin(key, value)
+                if raw:
+                    value, rehosted = raw, True
+                else:
+                    await interaction.followup.send(
+                        "Couldn't download that image (is it a direct PNG link?). "
+                        "Try uploading the file with `/skinupload` instead.",
+                        ephemeral=True)
+                    return
             sdata, sha = gh_download()
             if sdata is None:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "Remote accounts.json is corrupt.", ephemeral=True)
                 return
             players = sdata.setdefault("players", {})
@@ -768,8 +820,10 @@ class SetSkinModal(discord.ui.Modal, title="Choose skin for your account"):
             players[key] = {"skin": value}
             commit = gh_upload(sdata, sha, f"skinbot: panel set {key} = {value[:40]}")
             oldinfo = f" (before: `{old}`)" if old and old != value else ""
-            await interaction.response.send_message(
-                f"Skin of **{key}** → `{value}`{oldinfo}\nVisible in-game within 5 min.{f'  {commit}' if commit else ''}",
+            rh = "\nRe-hosted in our repo (CORS-safe)." if rehosted else ""
+            send = interaction.followup.send if rehosted else interaction.response.send_message
+            await send(
+                f"Skin of **{key}** → `{value}`{oldinfo}{rh}\nVisible in-game within 5 min.{f'  {commit}' if commit else ''}",
                 ephemeral=True)
         except Exception as e:
             warn("panel skin falló:", repr(e))
