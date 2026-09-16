@@ -92,6 +92,17 @@ CONGRATS = [
     "You're in! Show us those skins. ðŸ˜Ž",
     "Account secured. Time to shine! âœ¨",
     "New player spotted â€” welcome aboard! ðŸš€",
+    "Fresh account, fresh start â€” go follow your heart! ðŸ’œ",
+    "New name on the list, you can't be missed! ðŸ“‹",
+    "One more in the crew â€” we saved a spot for you! ðŸ¤",
+    "Account made, dreams displayed â€” welcome to the parade! ðŸŽ‰",
+    "Keys in hand, block by block you'll build your land! ðŸ§±",
+    "Signed and sealed, your fate revealed â€” go play the field! ðŸ”‘",
+    "You pressed create, and now it's fate â€” don't hesitate! âš¡",
+    "Blocks to break and worlds to make â€” welcome to the lake! ðŸŒŠ",
+    "From zero to hero, go show them you're no zero! ðŸ¦¸",
+    "The grind begins with brand new skins â€” let the wins begin! ðŸ†",
+    "A brand new page, the world's your stage â€” go cause a rampage! ðŸŽ­",
 ]
 
 async def notify_new_account(username, creator: discord.abc.User):
