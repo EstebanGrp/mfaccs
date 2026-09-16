@@ -35,6 +35,9 @@
     },
     "phongnguyen": {
       "skin": "file:///C:/Users/hiep/Downloads/char.png"
+    },
+    "not_senpai": {
+      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/not_senpai.png"
     }
   }
 }
