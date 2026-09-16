@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
 # ============================================================
-# MiniFeather SkinBot — bot de Discord que administra la DB de
-# skins compartidas (accounts.json en EstebanGrp/mfaccs) vía la API de GitHub.
+# MiniFeather SkinBot â€” bot de Discord que administra la DB de
+# skins compartidas (accounts.json en EstebanGrp/mfaccs) vÃ­a la API de GitHub.
 #
 # Comandos (slash) en un canal autorizado:
-#   /skin set    <jugador> <skin>     → asigna skin (id custom:mf_*,
+#   /skin set    <jugador> <skin>     â†’ asigna skin (id custom:mf_*,
 #                                       vanilla, ruta /skins/)
-#   /skin seturl <jugador> <url>      → asigna skin por URL de PNG
-#   /skin remove <jugador>            → quita el override
-#   /skin list   [página]             → lista la DB
-#   /skin reload                      → re-descarta cambios locales
-#   /skin sync                        → fuerza PUSH del archivo actual
+#   /skin seturl <jugador> <url>      â†’ asigna skin por URL de PNG
+#   /skin remove <jugador>            â†’ quita el override
+#   /skin list   [pÃ¡gina]             â†’ lista la DB
+#   /skin reload                      â†’ re-descarta cambios locales
+#   /skin sync                        â†’ fuerza PUSH del archivo actual
 #
 # Flujo:
 #   1. Un admin escribe el comando en Discord.
 #   2. El bot edita accounts.json con la API de contents de GitHub
-#      (GET → SHA → PUT con mensaje de commit).
-#   3. TODOS los clientes de la extensión ven el cambio al poco
+#      (GET â†’ SHA â†’ PUT con mensaje de commit).
+#   3. TODOS los clientes de la extensiÃ³n ven el cambio al poco
 #      tiempo: CustomSkins.js hace fetch del accounts.json remoto
 #      (raw.githubusercontent.com) y lo fusiona con el empaquetado.
 #
 # Requisitos:
 #   pip install discord.py requests
 #   Variables de entorno (o edita las constantes abajo):
-#     MFSB_TOKEN       → token del bot (Discord Developer Portal)
-#     MFSB_GH_TOKEN    → token de GitHub con permiso contents:write
-#     MFSB_REPO        → owner/repo  (default EstebanGrp/mfaccs)
-#     MFSB_BRANCH      → rama (default main)
-#     MFSB_ADMINS      → ids de Discord separados por coma
-#     MFSB_CHANNEL     → id del canal autorizado (opcional)
+#     MFSB_TOKEN       â†’ token del bot (Discord Developer Portal)
+#     MFSB_GH_TOKEN    â†’ token de GitHub con permiso contents:write
+#     MFSB_REPO        â†’ owner/repo  (default EstebanGrp/mfaccs)
+#     MFSB_BRANCH      â†’ rama (default main)
+#     MFSB_ADMINS      â†’ ids de Discord separados por coma
+#     MFSB_CHANNEL     â†’ id del canal autorizado (opcional)
 #
 # Arranque:
 #   python ai/discord_skinbot.py
@@ -47,16 +47,16 @@ try:
     from discord import app_commands
     from discord.ext import commands
 except ImportError:
-    print("[SkinBot] Falta discord.py  →  pip install discord.py")
+    print("[SkinBot] Falta discord.py  â†’  pip install discord.py")
     sys.exit(1)
 
 try:
     import requests
 except ImportError:
-    print("[SkinBot] Falta requests  →  pip install requests")
+    print("[SkinBot] Falta requests  â†’  pip install requests")
     sys.exit(1)
 
-# ── configuración ──
+# â”€â”€ configuraciÃ³n â”€â”€
 TOKEN = os.environ.get("MFSB_TOKEN", "")
 GH_TOKEN = os.environ.get("MFSB_GH_TOKEN", "")
 REPO = os.environ.get("MFSB_REPO", "EstebanGrp/mfaccs")
@@ -64,14 +64,15 @@ BRANCH = os.environ.get("MFSB_BRANCH", "main")
 ACCOUNTS_PATH = "accounts.json"
 ADMINS = [s.strip() for s in os.environ.get("MFSB_ADMINS", "").split(",") if s.strip()]
 CHANNEL_ID = os.environ.get("MFSB_CHANNEL", "")
+LOG_CHANNEL_ID = os.environ.get("MFSB_LOG_CHANNEL", "1549572492434346015")
 
-# DB local de cuentas MiniFeather (NO va al repo público: contraseñas)
-#   ai/mf_accounts.json  → { "cuentas": { "<usuario>": {...} } }
+# DB local de cuentas MiniFeather (NO va al repo pÃºblico: contraseÃ±as)
+#   ai/mf_accounts.json  â†’ { "cuentas": { "<usuario>": {...} } }
 ACCOUNTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mf_accounts.json")
 
 GH_API = f"https://api.github.com/repos/{REPO}"
 RAW_URL = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{ACCOUNTS_PATH}"
-SKINS_DIR = "skins"  # repo público: mfaccs/skins/<user>.png
+SKINS_DIR = "skins"  # repo pÃºblico: mfaccs/skins/<user>.png
 SKINS_RAW = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{SKINS_DIR}"
 
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
@@ -82,6 +83,18 @@ def warn(*a):
     print("[SkinBot]", *a, file=sys.stderr)
 
 
+async def notify_new_account(username, creator: discord.abc.User):
+    try:
+        ch = bot.get_channel(int(LOG_CHANNEL_ID))
+        if ch is None:
+            ch = await bot.fetch_channel(int(LOG_CHANNEL_ID))
+        await ch.send(
+            f"ðŸ†• New MiniFeather account: **{username}** â€” created by {creator.mention}"
+        )
+    except Exception as e:
+        warn("notify_new_account fallÃ³:", repr(e))
+
+
 def gh_headers():
     return {
         "Accept": "application/vnd.github+json",
@@ -90,7 +103,7 @@ def gh_headers():
     }
 
 
-# ── GitHub: leer / escribir accounts.json ──
+# â”€â”€ GitHub: leer / escribir accounts.json â”€â”€
 def gh_download():
     """Descarga accounts.json del repo. Devuelve (data, sha|None)."""
     r = requests.get(
@@ -134,9 +147,9 @@ def gh_upload(data, sha, msg):
 
 
 def gh_upload_png(user, png_bytes):
-    """Sube skins/<user>.png al repo público. Devuelve la URL raw."""
+    """Sube skins/<user>.png al repo pÃºblico. Devuelve la URL raw."""
     path = f"{SKINS_DIR}/{user}.png"
-    # sha previo si ya existía (para reemplazo)
+    # sha previo si ya existÃ­a (para reemplazo)
     sha = None
     r = requests.get(f"{GH_API}/contents/{path}?ref={BRANCH}", headers=gh_headers(), timeout=15)
     if r.status_code == 200:
@@ -159,9 +172,9 @@ EXTERNAL_RE = re.compile(r"^https?://(?!raw\.githubusercontent\.com)", re.I)
 
 def rehost_external_skin(user, url):
     """Descarga un PNG de una URL externa (minecraftskins.com, etc.) y lo
-    re-sube al repo propio. Así el client lo carga desde raw.githubusercontent
-    (que SÍ permite CORS) en vez de chocar con el hotlink-block del origen.
-    Devuelve la URL raw, o None si la descarga falló."""
+    re-sube al repo propio. AsÃ­ el client lo carga desde raw.githubusercontent
+    (que SÃ permite CORS) en vez de chocar con el hotlink-block del origen.
+    Devuelve la URL raw, o None si la descarga fallÃ³."""
     try:
         r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0 (skinbot)"})
         if r.status_code != 200:
@@ -176,7 +189,7 @@ def rehost_external_skin(user, url):
             return None
         return gh_upload_png(user, png)
     except Exception as e:
-        warn("rehost falló:", repr(e))
+        warn("rehost fallÃ³:", repr(e))
         return None
 
 
@@ -184,7 +197,7 @@ def validate_skin_value(value):
     """Mismas reglas que normalizeSkinValue de CustomSkins.js."""
     v = (value or "").strip()
     if not v:
-        return False, "vacío"
+        return False, "vacÃ­o"
     if v.startswith("custom:"):
         return True, "id custom del client"
     if re.match(r"^(https?://|chrome-extension://|file://|data:image/|blob:)", v, re.I):
@@ -196,13 +209,13 @@ def validate_skin_value(value):
     return False, "formato no reconocido"
 
 
-# ── cuentas MiniFeather (local, con contraseñas hasheadas) ──
+# â”€â”€ cuentas MiniFeather (local, con contraseÃ±as hasheadas) â”€â”€
 USER_RE = re.compile(r"^[a-z0-9_]{3,16}$", re.I)
 
-# En GitHub Actions el disco es efímero: el archivo de cuentas vive en un
+# En GitHub Actions el disco es efÃ­mero: el archivo de cuentas vive en un
 # REPO PRIVADO y se sincroniza por la API de contents (igual que skins).
-#   MFSB_ACC_REPO  → owner/repo privado (ej. EstebanGrp/mfaccs-private)
-#   MFSB_ACC_PATH  → nombre del archivo (default mf_accounts.json)
+#   MFSB_ACC_REPO  â†’ owner/repo privado (ej. EstebanGrp/mfaccs-private)
+#   MFSB_ACC_PATH  â†’ nombre del archivo (default mf_accounts.json)
 # Sin esas vars, sigue usando el archivo local como siempre.
 ACC_REPO = os.environ.get("MFSB_ACC_REPO", "")
 ACC_PATH = os.environ.get("MFSB_ACC_PATH", "mf_accounts.json")
@@ -267,7 +280,7 @@ def load_local_accounts():
     """Lee las cuentas. En modo remoto (Actions) viene del repo privado;
     localmente de ai/mf_accounts.json. Estructura:
     { "cuentas": { "<usuario>": {
-          "hash": "<pbkdf2$iter$salt$dk>",   # contraseña
+          "hash": "<pbkdf2$iter$salt$dk>",   # contraseÃ±a
           "discord_id": "123...",             # cuenta de Discord vinculada
           "discord_tag": "nombre",            # nombre en Discord al vincular
           "created": 1690000000,
@@ -280,7 +293,7 @@ def load_local_accounts():
             if data is not None:
                 return data
         except Exception as e:
-            warn("acc_download falló, sigo con lo local:", e)
+            warn("acc_download fallÃ³, sigo con lo local:", e)
     if not os.path.exists(ACCOUNTS_FILE):
         return {"cuentas": {}}
     try:
@@ -326,7 +339,7 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
-# ── bot de Discord ──
+# â”€â”€ bot de Discord â”€â”€
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -354,7 +367,7 @@ async def on_ready():
     # con "The application did not respond"
     bot.add_view(PanelView())
     await tree.sync()
-    warn(f"SkinBot listo como {bot.user} — repo {REPO}@{BRANCH}")
+    warn(f"SkinBot listo como {bot.user} â€” repo {REPO}@{BRANCH}")
     warn(f"canal autorizado: {CHANNEL_ID or '(todos)'} | admins: {len(ADMINS) or '(todos)'}")
 
 
@@ -364,7 +377,7 @@ async def on_ready():
     player="username o uuid del jugador",
     skin="id de skin (custom:mf_..., vanilla, ruta /skins/)",
     url="URL del PNG (para seturl)",
-    page="página para list",
+    page="pÃ¡gina para list",
 )
 @app_commands.choices(action=[
     app_commands.Choice(name="set", value="set"),
@@ -389,7 +402,7 @@ async def skin_cmd(interaction: discord.Interaction,
     act = (action or "").lower()
 
     try:
-        # ── acciones sin descargar ──
+        # â”€â”€ acciones sin descargar â”€â”€
         if act == "sync":
             data, sha = gh_download()
             if data is None:
@@ -408,7 +421,7 @@ async def skin_cmd(interaction: discord.Interaction,
             await interaction.followup.send(f"Descartado. Remote tiene {n} entradas.")
             return
 
-        # ── acciones con jugador ──
+        # â”€â”€ acciones con jugador â”€â”€
         if act in ("set", "seturl", "remove"):
             key = (player or "").strip()
             if not key:
@@ -436,12 +449,12 @@ async def skin_cmd(interaction: discord.Interaction,
             value = (skin if act == "set" else url).strip()
             if act == "seturl":
                 if not re.match(r"^https?://", value, re.I):
-                    await interaction.followup.send("seturl exige http(s)://…")
+                    await interaction.followup.send("seturl exige http(s)://â€¦")
                     return
             else:
                 ok, why = validate_skin_value(value)
                 if not ok:
-                    await interaction.followup.send(f"Skin inválida ({why}).")
+                    await interaction.followup.send(f"Skin invÃ¡lida ({why}).")
                     return
             # re-host de URLs externas (CORS desde miniblox.io)
             rehosted = False
@@ -451,7 +464,7 @@ async def skin_cmd(interaction: discord.Interaction,
                     value, rehosted = raw, True
                 else:
                     await interaction.followup.send(
-                        "No pude descargar esa imagen (¿es un link directo a PNG?). "
+                        "No pude descargar esa imagen (Â¿es un link directo a PNG?). "
                         "Sube el archivo con /skinupload.")
                     return
             old = players.get(key, {}).get("skin")
@@ -460,7 +473,7 @@ async def skin_cmd(interaction: discord.Interaction,
             oldinfo = f" (antes: `{old}`)" if old and old != value else ""
             rh = "\nRe-hosteada en nuestro repo (sin CORS)." if rehosted else ""
             await interaction.followup.send(
-                f"OK — `{key}` ({kdisp}) → `{value}`{oldinfo}{rh}\n{commit}")
+                f"OK â€” `{key}` ({kdisp}) â†’ `{value}`{oldinfo}{rh}\n{commit}")
 
         elif act == "list":
             data, _sha = gh_download()
@@ -473,33 +486,33 @@ async def skin_cmd(interaction: discord.Interaction,
             pages = max(1, (total + PER - 1) // PER)
             page = max(1, min(page, pages))
             chunk = entries[(page - 1) * PER: page * PER]
-            lines = [f"**DB de skins** — {total} entradas (pág {page}/{pages}):"]
+            lines = [f"**DB de skins** â€” {total} entradas (pÃ¡g {page}/{pages}):"]
             for k, v in chunk:
                 sv = (v or {}).get("skin", "?")
                 if len(sv) > 42:
-                    sv = sv[:39] + "…"
-                lines.append(f"`{k}` → {sv}")
+                    sv = sv[:39] + "â€¦"
+                lines.append(f"`{k}` â†’ {sv}")
             await interaction.followup.send("\n".join(lines))
 
         else:
             await interaction.followup.send(
-                "Acción desconocida. Usa set / seturl / remove / list / reload / sync.")
+                "AcciÃ³n desconocida. Usa set / seturl / remove / list / reload / sync.")
 
     except Exception as e:
-        warn("comando falló:", repr(e))
+        warn("comando fallÃ³:", repr(e))
         try:
             await interaction.followup.send(f"Error: {e}")
         except Exception:
             pass
 
 
-@tree.command(name="skinupload", description="Upload your own skin PNG — it becomes your in-game skin")
+@tree.command(name="skinupload", description="Upload your own skin PNG â€” it becomes your in-game skin")
 @app_commands.describe(image="Square or 2:1 PNG skin file (64-2048px, power of 2)")
 async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attachment):
     if not in_channel(interaction):
         await interaction.response.send_message("Unauthorized channel.", ephemeral=True)
         return
-    # público: cualquiera del canal puede subir la SUYA (requiere cuenta vinculada)
+    # pÃºblico: cualquiera del canal puede subir la SUYA (requiere cuenta vinculada)
     await interaction.response.defer(ephemeral=True)
 
     try:
@@ -509,7 +522,7 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
         mine = [u for u, r in recs.items() if r.get("discord_id") == did]
         if not mine:
             await interaction.followup.send(
-                "You need a MiniFeather account first — use the panel's **Create account** button."
+                "You need a MiniFeather account first â€” use the panel's **Create account** button."
             )
             return
         user = mine[0]
@@ -532,22 +545,22 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
         data.setdefault("players", {})[user] = {"skin": raw_url}
         commit = gh_upload(data, sha, f"skinbot: skinupload {user}")
         await interaction.followup.send(
-            f"Skin uploaded — `{user}` → `{raw_url}`\nVisible in-game in ≤5 min.\n{commit}"
+            f"Skin uploaded â€” `{user}` â†’ `{raw_url}`\nVisible in-game in â‰¤5 min.\n{commit}"
         )
 
     except Exception as e:
-        warn("skinupload falló:", repr(e))
+        warn("skinupload fallÃ³:", repr(e))
         try:
             await interaction.followup.send(f"Error: {e}")
         except Exception:
             pass
 
 
-@tree.command(name="mfaccount", description="Cuentas MiniFeather con contraseña, vinculadas a Discord")
+@tree.command(name="mfaccount", description="Cuentas MiniFeather con contraseÃ±a, vinculadas a Discord")
 @app_commands.describe(
     action="create / link / unlink / passwd / info / list / delete",
     username="nombre de la cuenta MiniFeather",
-    password="contraseña (para create/passwd)",
+    password="contraseÃ±a (para create/passwd)",
     account="nombre de la cuenta (para link del admin)",
 )
 @app_commands.choices(action=[
@@ -577,11 +590,11 @@ async def mfaccount_cmd(interaction: discord.Interaction,
                 return name, c
         return None, None
 
-    # ── CREATE: cualquiera puede crear su cuenta ──
+    # â”€â”€ CREATE: cualquiera puede crear su cuenta â”€â”€
     if act == "create":
         if not username or not password:
             await interaction.response.send_message(
-                "Uso: /mfaccount create username:pepito password:•••", ephemeral=True)
+                "Uso: /mfaccount create username:pepito password:â€¢â€¢â€¢", ephemeral=True)
             return
         if not USER_RE.match(username):
             await interaction.response.send_message(
@@ -589,7 +602,7 @@ async def mfaccount_cmd(interaction: discord.Interaction,
             return
         if len(password) < 6:
             await interaction.response.send_message(
-                "Contraseña mínima: 6 caracteres.", ephemeral=True)
+                "ContraseÃ±a mÃ­nima: 6 caracteres.", ephemeral=True)
             return
         key = username.lower()
         if key in cuentas:
@@ -609,12 +622,13 @@ async def mfaccount_cmd(interaction: discord.Interaction,
             "creator": uid,
         }
         save_local_accounts(data)
+        await notify_new_account(username, interaction.user)
         await interaction.response.send_message(
             f"Cuenta `{username}` creada y vinculada a {interaction.user.mention}. "
-            "La contraseña vive hasheada (PBKDF2) solo en la PC del bot.", ephemeral=True)
+            "La contraseÃ±a vive hasheada (PBKDF2) solo en la PC del bot.", ephemeral=True)
         return
 
-    # ── acciones que requieren dueño o admin ──
+    # â”€â”€ acciones que requieren dueÃ±o o admin â”€â”€
     if not is_admin(interaction):
         await interaction.response.send_message("No autorizado.", ephemeral=True)
         return
@@ -655,11 +669,11 @@ async def mfaccount_cmd(interaction: discord.Interaction,
                 await interaction.followup.send(f"No existe la cuenta `{key}`.")
                 return
             if len(password) < 6:
-                await interaction.followup.send("Contraseña mínima: 6 caracteres.")
+                await interaction.followup.send("ContraseÃ±a mÃ­nima: 6 caracteres.")
                 return
             cuentas[key]["hash"] = hash_password(password)
             save_local_accounts(data)
-            await interaction.followup.send(f"Contraseña de `{key}` actualizada.")
+            await interaction.followup.send(f"ContraseÃ±a de `{key}` actualizada.")
 
         elif act == "info":
             key = (username or "").strip().lower()
@@ -676,20 +690,20 @@ async def mfaccount_cmd(interaction: discord.Interaction,
                 return
             did = entry.get("discord_id")
             lines = [f"**{key}**",
-                     f"Discord: {f'<@{did}>' if did else '—'}",
+                     f"Discord: {f'<@{did}>' if did else 'â€”'}",
                      f"Creada: <t:{entry.get('created', 0)}:R>",
                      f"Creador: <@{entry.get('creator', '0')}>"]
             await interaction.followup.send("\n".join(lines))
 
         elif act == "list":
             if not cuentas:
-                await interaction.followup.send("Sin cuentas aún.")
+                await interaction.followup.send("Sin cuentas aÃºn.")
                 return
-            lines = ["**Cuentas MiniFeather** — %d:" % len(cuentas)]
+            lines = ["**Cuentas MiniFeather** â€” %d:" % len(cuentas)]
             for name, c in sorted(cuentas.items()):
                 did = c.get("discord_id")
                 who = f"<@{did}>" if did else "sin vincular"
-                lines.append(f"`{name}` → {who}")
+                lines.append(f"`{name}` â†’ {who}")
             await interaction.followup.send("\n".join(lines))
 
         elif act == "delete":
@@ -703,17 +717,17 @@ async def mfaccount_cmd(interaction: discord.Interaction,
 
         else:
             await interaction.followup.send(
-                "Acción desconocida. create / link / unlink / passwd / info / list / delete")
+                "AcciÃ³n desconocida. create / link / unlink / passwd / info / list / delete")
 
     except Exception as e:
-        warn("mfaccount falló:", repr(e))
+        warn("mfaccount fallÃ³:", repr(e))
         try:
             await interaction.followup.send(f"Error: {e}")
         except Exception:
             pass
 
 
-# ── /panel: GUI with buttons + modals ───────────────────────────
+# â”€â”€ /panel: GUI with buttons + modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class CreateAccountModal(discord.ui.Modal, title="Create MiniFeather account"):
     username = discord.ui.TextInput(
@@ -757,12 +771,13 @@ class CreateAccountModal(discord.ui.Modal, title="Create MiniFeather account"):
             await interaction.response.send_message(
                 f"Could not save (accounts repo?): {e}", ephemeral=True)
             return
+        await notify_new_account(username, interaction.user)
         await interaction.response.send_message(
-            f"Account **{username}** created and linked to {interaction.user.mention} ✅",
+            f"Account **{username}** created and linked to {interaction.user.mention} âœ…",
             ephemeral=True)
 
     async def on_error(self, interaction, error):
-        warn("modal create falló:", repr(error))
+        warn("modal create fallÃ³:", repr(error))
         try:
             await interaction.response.send_message(f"Error: {error}", ephemeral=True)
         except Exception:
@@ -797,7 +812,7 @@ class SetSkinModal(discord.ui.Modal, title="Choose skin for your account"):
             return
         try:
             # URLs externas (minecraftskins.com, etc.) bloquean CORS desde
-            # miniblox.io → re-host en nuestro repo antes de guardar
+            # miniblox.io â†’ re-host en nuestro repo antes de guardar
             rehosted = False
             if EXTERNAL_RE.match(value):
                 await interaction.response.defer(ephemeral=True)
@@ -823,17 +838,17 @@ class SetSkinModal(discord.ui.Modal, title="Choose skin for your account"):
             rh = "\nRe-hosted in our repo (CORS-safe)." if rehosted else ""
             send = interaction.followup.send if rehosted else interaction.response.send_message
             await send(
-                f"Skin of **{key}** → `{value}`{oldinfo}{rh}\nVisible in-game within 5 min.{f'  {commit}' if commit else ''}",
+                f"Skin of **{key}** â†’ `{value}`{oldinfo}{rh}\nVisible in-game within 5 min.{f'  {commit}' if commit else ''}",
                 ephemeral=True)
         except Exception as e:
-            warn("panel skin falló:", repr(e))
+            warn("panel skin fallÃ³:", repr(e))
             try:
                 await interaction.response.send_message(f"Error: {e}", ephemeral=True)
             except Exception:
                 pass
 
     async def on_error(self, interaction, error):
-        warn("modal skin falló:", repr(error))
+        warn("modal skin fallÃ³:", repr(error))
         try:
             await interaction.response.send_message(f"Error: {error}", ephemeral=True)
         except Exception:
@@ -845,7 +860,7 @@ class PanelView(discord.ui.View):
         super().__init__(timeout=None)  # persistent
 
     @discord.ui.button(label="Create account", style=discord.ButtonStyle.green,
-                       emoji="🪶", custom_id="mfsb:crear")
+                       emoji="ðŸª¶", custom_id="mfsb:crear")
     async def crear(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not in_channel(interaction):
             await interaction.response.send_message("Channel not authorized.", ephemeral=True)
@@ -853,7 +868,7 @@ class PanelView(discord.ui.View):
         await interaction.response.send_modal(CreateAccountModal())
 
     @discord.ui.button(label="Set skin", style=discord.ButtonStyle.blurple,
-                       emoji="🎨", custom_id="mfsb:skin")
+                       emoji="ðŸŽ¨", custom_id="mfsb:skin")
     async def skin(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not in_channel(interaction):
             await interaction.response.send_message("Channel not authorized.", ephemeral=True)
@@ -861,7 +876,7 @@ class PanelView(discord.ui.View):
         await interaction.response.send_modal(SetSkinModal())
 
     @discord.ui.button(label="My account", style=discord.ButtonStyle.gray,
-                       emoji="ℹ️", custom_id="mfsb:info")
+                       emoji="â„¹ï¸", custom_id="mfsb:info")
     async def info(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not in_channel(interaction):
             await interaction.response.send_message("Channel not authorized.", ephemeral=True)
@@ -880,24 +895,24 @@ class PanelView(discord.ui.View):
         did = entry.get("discord_id")
         await interaction.response.send_message(
             f"**{key}**\n"
-            f"Discord: {f'<@{did}>' if did else '—'}\n"
+            f"Discord: {f'<@{did}>' if did else 'â€”'}\n"
             f"Created: <t:{entry.get('created', 0)}:R>\n"
             f"Creator: <@{entry.get('creator', '0')}>",
             ephemeral=True)
 
 
 PANEL_EMBED = discord.Embed(
-    title="🪶 MiniFeather — Accounts & Skins",
+    title="ðŸª¶ MiniFeather â€” Accounts & Skins",
     description=(
         "Create your MiniFeather account (password-protected, linked to your Discord) "
         "and choose the skin others will see in-game.\n\n"
         "**Upload your own skin:** use `/skinupload` with a PNG attached "
-        "(square or 2:1, 64–2048px).\n\n"
+        "(square or 2:1, 64â€“2048px).\n\n"
         "**Skin formats (Set skin):**\n"
-        "`custom:mf_...` — client custom id\n"
-        "`chris`, `bob` — Miniblox vanilla\n"
-        "`devs/itzesteban` — pack path\n"
-        "`https://...png` — absolute URL"
+        "`custom:mf_...` â€” client custom id\n"
+        "`chris`, `bob` â€” Miniblox vanilla\n"
+        "`devs/itzesteban` â€” pack path\n"
+        "`https://...png` â€” absolute URL"
     ),
     color=0x5865F2,
 )
@@ -922,7 +937,7 @@ def main():
     if not GH_TOKEN:
         print("[SkinBot] Falta MFSB_GH_TOKEN (token de GitHub con contents:write).")
         sys.exit(1)
-    warn(f"repo: {REPO}@{BRANCH} · path: {ACCOUNTS_PATH}")
+    warn(f"repo: {REPO}@{BRANCH} Â· path: {ACCOUNTS_PATH}")
     bot.run(TOKEN)
 
 
