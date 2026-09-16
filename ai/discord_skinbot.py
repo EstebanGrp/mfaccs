@@ -85,22 +85,21 @@ def warn(*a):
 
 
 CONGRATS = [
-    "Welcome to the flock! ðŸª¶",
-    "Another feather joins the nest! ðŸª¶âœ¨",
-    "Mine the blocks and place them right â€” your Miniblox future's looking bright! â›ï¸",
-    "From Skywars drops to Eggwars fights â€” go dominate those island nights! ðŸ¥š",
-    "Bow in hand, one arrow true â€” that One-In-The-Quiver spot's for you! ðŸ¹",
-    "Diamond gear and golden apples â€” stack your loot and join the battles! ðŸ’Ž",
-    "Parkour pro or building king â€” Miniblox has everything! ðŸƒ",
-    "Egg smashed, base defended â€” this new account will be remembered! ðŸ¥š",
-    "Chop the wood and craft your tools â€” welcome to the Miniblox schools! ðŸª“",
-    "Oneblock sky, infinite grind â€” your island empire starts in the mind! â˜ï¸",
-    "Kit up, fight and never fall â€” the leaderboards await your call! ðŸ“Š",
-    "Plot claimed, creative mode â€” go build the castle of the road! ðŸ°",
-    "Gapple munch and crits that land â€” soon they'll know your name firsthand! ðŸŽ",
-    "Bridge the gap in Duels tonight â€” clutch it, win it, show them right! ðŸŒ‰",
-    "From lobby chat to Skyblock fame â€” go carve your name into the game! ðŸï¸",
-    "Spawn, loot, and don't look back â€” your Miniblox story's on track! ðŸŽ¯",
+    "Every journey begins before you know where it will lead.",
+    "A new name carries no history, only possibility.",
+    "You cannot change the beginning, but you can shape what follows.",
+    "What you build today becomes the world you wake up in tomorrow.",
+    "Some paths are discovered only after you take the first step.",
+    "A blank page is not empty. It is waiting.",
+    "The world remembers what you choose to leave behind.",
+    "You start with nothing, but nothing is where everything begins.",
+    "Every choice closes a door and opens a path.",
+    "Time turns moments into memories, and memories into stories.",
+    "You don't need a past to give meaning to a beginning.",
+    "The first step means nothing until you decide where to take the second.",
+    "Even the smallest block can become part of something greater.",
+    "A beginning has no meaning until someone gives it one.",
+    "Perhaps the point was never to reach the end, but to see what you became along the way.",
 ]
 
 async def notify_new_account(username, creator: discord.abc.User):
