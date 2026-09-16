@@ -36,6 +36,7 @@
 import base64
 import hashlib
 import json
+import random
 import os
 import re
 import secrets
@@ -83,13 +84,24 @@ def warn(*a):
     print("[SkinBot]", *a, file=sys.stderr)
 
 
+CONGRATS = [
+    "Welcome to the flock! ðŸª¶",
+    "Another feather joins the nest! ðŸª¶âœ¨",
+    "GG! Your journey starts now. ðŸŽ®",
+    "Great pick! Happy building! ðŸ—ï¸",
+    "You're in! Show us those skins. ðŸ˜Ž",
+    "Account secured. Time to shine! âœ¨",
+    "New player spotted â€” welcome aboard! ðŸš€",
+]
+
 async def notify_new_account(username, creator: discord.abc.User):
     try:
         ch = bot.get_channel(int(LOG_CHANNEL_ID))
         if ch is None:
             ch = await bot.fetch_channel(int(LOG_CHANNEL_ID))
+        msg = random.choice(CONGRATS)
         await ch.send(
-            f"ðŸ†• New MiniFeather account: **{username}** â€” created by {creator.mention}"
+            f"ðŸ†• New MiniFeather account: **{username}** â€” created by {creator.mention}\n{msg}"
         )
     except Exception as e:
         warn("notify_new_account fallÃ³:", repr(e))
