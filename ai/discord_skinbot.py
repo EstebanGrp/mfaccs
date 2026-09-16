@@ -140,10 +140,76 @@ def gh_download():
     sha = j["sha"]
     try:
         data = json.loads(content)
-    except json.JSONDecodeError as e:
-        warn("accounts.json remoto corrupto:", e)
-        return None, sha
+    except json.JSONDecodeError:
+        data = _salvage_accounts_json(content)
+        if data is None:
+            warn("accounts.json remoto corrupto: no se pudo reparar")
+            return None, sha
+        warn("accounts.json remoto corrupto — auto-reparado (wrapper players)")
+        return data, sha
+    if isinstance(data, dict) and "players" not in data and data and all(
+        isinstance(v, dict) for v in data.values()
+    ):
+        # dict de players al ras (sin wrapper): envolver
+        warn("accounts.json remoto sin wrapper 'players' — auto-reparado")
+        return {"players": data}, sha
     return data, sha
+
+
+_TOP_PAIR_RE = re.compile(r'"((?:[^"\\]|\\.)*)"\s*:\s*(\{)', re.DOTALL)
+
+
+def _salvage_accounts_json(content: str):
+    """Recupera accounts.json dañado por escrituras viejas del panel-set.
+    Caso real observado: falta la clave 'players' (el dict de jugadores
+    quedó al ras) y a veces sobra/falta una llave de cierre. Estrategia:
+    extraer cada '"clave": { ... }' de nivel superior y reconstruir
+    {"players": {...}}. Devuelve None si no se recupera nada."""
+    out = {}
+    pos = 0
+    for m in _TOP_PAIR_RE.finditer(content):
+        key = m.group(1)
+        b = m.start(2)
+        depth = 0
+        in_str = False
+        esc = False
+        end = -1
+        for j in range(b, len(content)):
+            c = content[j]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == '\\':
+                    esc = True
+                elif c == '"':
+                    in_str = False
+            elif c == '"':
+                in_str = True
+            elif c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    end = j
+                    break
+        if end == -1:
+            # valor incompleto: tomar hasta el final y cerrar llaves
+            frag = content[b:].strip().rstrip(',') + '}' * max(1, depth)
+            try:
+                out[key] = json.loads(frag)
+            except json.JSONDecodeError:
+                pass
+            break
+        try:
+            out[key] = json.loads(content[b:end + 1])
+        except json.JSONDecodeError:
+            pass
+    if not out:
+        return None
+    if set(out.keys()) == {"players"}:
+        # ya venía con su wrapper: no doble-envolver
+        return out
+    return {"players": out}
 
 
 def gh_upload(data, sha, msg):
