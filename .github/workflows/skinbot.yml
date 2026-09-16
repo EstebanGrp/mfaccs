@@ -42,7 +42,7 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias
-        run: pip install discord.py requests
+        run: pip install discord.py requests websockets
 
       - name: Arrancar el bot
         env:
