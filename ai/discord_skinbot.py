@@ -42,6 +42,7 @@ import re
 import secrets
 import sys
 import time
+from collections import deque
 
 try:
     import discord
@@ -389,6 +390,113 @@ async def on_ready():
     await tree.sync()
     warn(f"SkinBot listo como {bot.user} â€” repo {REPO}@{BRANCH}")
     warn(f"canal autorizado: {CHANNEL_ID or '(todos)'} | admins: {len(ADMINS) or '(todos)'}")
+    # listener de creaciones de cuenta desde el client (ntfy)
+    bot.loop.create_task(ntfy_client_accounts_loop())
+
+
+# â”€â”€ creaciones de cuenta desde el client (ntfy) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+NTFY_ACC_TOPIC = os.environ.get("MFSB_NTFY_ACC_TOPIC", "mf-accounts-req-v1")
+NTFY_SEEN_MAX = 500
+_ntfy_seen: deque = deque(maxlen=NTFY_SEEN_MAX)
+
+
+def is_valid_client_request(req):
+    """Valida la petición de creación que envía el client por ntfy."""
+    if not isinstance(req, dict) or req.get("type") != "mf_account_create":
+        return False, "formato"
+    username = str(req.get("username") or "")
+    if not USER_RE.match(username):
+        return False, "username"
+    if not isinstance(req.get("password"), str) or len(req["password"]) < 6 or len(req["password"]) > 64:
+        return False, "password"
+    if not isinstance(req.get("at"), (int, float)) or abs(time.time() - req["at"]) > 600:
+        return False, "timestamp"
+    return True, username
+
+
+async def handle_client_account_create(req):
+    """Crea la cuenta pedida desde el client y anuncia en el canal de log."""
+    ok, why = is_valid_client_request(req)
+    username = str(req.get("username") or "")
+    password = str(req.get("password") or "")
+    skin = str(req.get("skin") or "").strip() or None
+    if not ok:
+        warn(f"client create rechazada ({why}):", str(req)[:200])
+        return
+    data = load_local_accounts()
+    cuentas = data["cuentas"]
+    key = username.lower()
+    if key in cuentas:
+        warn(f"client create: {key} ya existe")
+        return
+    cuentas[key] = {
+        "hash": hash_password(password),
+        "discord_id": "",
+        "discord_tag": f"client:{req.get('client', '?')}",
+        "created": int(time.time()),
+        "creator": "client",
+        "source": "client",
+    }
+    try:
+        save_local_accounts(data)
+    except Exception as e:
+        warn("client create: no se pudo guardar:", repr(e))
+        return
+    # skin inicial opcional → accounts.json público
+    if skin:
+        try:
+            ok_skin, _why = validate_skin_value(skin)
+            if ok_skin:
+                sdata, sha = gh_download()
+                if sdata is not None:
+                    sdata.setdefault("players", {})[key] = {"skin": skin}
+                    gh_upload(sdata, sha, f"skinbot: client create {key}")
+        except Exception as e:
+            warn("client create: skin inicial fallÃ³:", repr(e))
+    try:
+        ch = bot.get_channel(int(LOG_CHANNEL_ID)) or await bot.fetch_channel(int(LOG_CHANNEL_ID))
+        await ch.send(f"ðŸ†• Account **{username}** created from the MiniFeather Client")
+    except Exception as e:
+        warn("notify client create fallÃ³:", repr(e))
+    warn(f"client create OK: {key}")
+
+
+async def ntfy_client_accounts_loop():
+    """Suscripción WS al topic ntfy de peticiones del client.
+    El client manda el JSON plano (con la contraseña real dentro; ntfy
+    es público así que esto es SOLO para el ecosistema de confianza —
+    la contraseña llega hasheada a la DB, nunca en claro)."""
+    import asyncio
+    ws = None
+    backoff = 2
+    while not bot.is_closed():
+        try:
+            import asyncio
+            import websockets
+            uri = f"wss://ntfy.sh/{NTFY_ACC_TOPIC}/ws?since=30s"
+            async with websockets.connect(uri) as w:
+                ws = w
+                backoff = 2
+                async for raw in w:
+                    try:
+                        packet = json.loads(raw)
+                        if packet.get("event") != "message":
+                            continue
+                        mid = packet.get("id") or packet.get("time")
+                        if mid in _ntfy_seen:
+                            continue
+                        _ntfy_seen.append(mid)
+                        try:
+                            req = json.loads(packet.get("message") or "")
+                        except json.JSONDecodeError:
+                            continue
+                        await handle_client_account_create(req)
+                    except Exception as e:
+                        warn("ntfy msg error:", repr(e))
+        except Exception as e:
+            warn(f"ntfy ws error: {e!r} — reintento en {backoff}s")
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 60)
 
 
 @tree.command(name="skin", description="Administrar la DB de skins compartidas (accounts.json)")
