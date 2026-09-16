@@ -92,7 +92,7 @@ CONGRATS = [
     "Bow in hand, one arrow true â€” that One-In-The-Quiver spot's for you! ðŸ¹",
     "Diamond gear and golden apples â€” stack your loot and join the battles! ðŸ’Ž",
     "Parkour pro or building king â€” Miniblox has everything! ðŸƒ",
-    "Bed broken, base defended â€” this new account will be remembered! ðŸ›ï¸",
+    "Egg smashed, base defended â€” this new account will be remembered! ðŸ¥š",
     "Chop the wood and craft your tools â€” welcome to the Miniblox schools! ðŸª“",
     "Oneblock sky, infinite grind â€” your island empire starts in the mind! â˜ï¸",
     "Kit up, fight and never fall â€” the leaderboards await your call! ðŸ“Š",
