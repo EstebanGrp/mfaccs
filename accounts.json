@@ -1,13 +1,31 @@
 {
   "players": {
-    "shusukegxe_": { "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe.png" },
-    "itzesteban": { "skin": "custom:mf_dev_itzesteban" },
-    "nightrise": { "skin": "custom:mf_dev_nightrise" },
-    "notsenpai": { "skin": "custom:mf_dev_notsenpai" },
-    "gab": { "skin": "custom:mf_dev_gab" },
-    "eve": { "skin": "custom:mf_eve" },
-    "angrywolfx": { "skin": "https://t.novaskin.me/31c57b47825af14e2ea709d08b2a817f7db1b3fba6df7f996a6151993feaf85a" },
-    "phongnguyen": { "skin": "file:///C:/Users/hiep/Downloads/char.png" },
-    "not_senpai": { "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/not_senpai.png" }
+    "shusukegxe_": {
+      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe_.png"
+    },
+    "itzesteban": {
+      "skin": "custom:mf_dev_itzesteban"
+    },
+    "nightrise": {
+      "skin": "custom:mf_dev_nightrise"
+    },
+    "notsenpai": {
+      "skin": "custom:mf_dev_notsenpai"
+    },
+    "gab": {
+      "skin": "custom:mf_dev_gab"
+    },
+    "eve": {
+      "skin": "custom:mf_eve"
+    },
+    "angrywolfx": {
+      "skin": "https://t.novaskin.me/31c57b47825af14e2ea709d08b2a817f7db1b3fba6df7f996a6151993feaf85a"
+    },
+    "phongnguyen": {
+      "skin": "file:///C:/Users/hiep/Downloads/char.png"
+    },
+    "not_senpai": {
+      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/not_senpai.png"
+    }
   }
 }
