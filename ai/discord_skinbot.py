@@ -234,33 +234,28 @@ def gh_upload(data, sha, msg):
 
 
 def skin_slug(user):
-    """Nombre de archivo limpio para skins/<slug>.png: usernames con '_'
-    final (ej. shusukegxe_) generan URLs feas y duplicados contra el
-    archivo sin underscore — se recortan los '_' de los extremos."""
+    """Nombre de carpeta limpio para skins/<slug>/: usernames con '_'
+    final (ej. shusukegxe_) generan rutas feas — se recortan los '_' de
+    los extremos."""
     s = user.strip().strip("_")
     return s if re.match(r"^[A-Za-z0-9_-]{2,64}$", s) else user
 
 
 def gh_upload_png(user, png_bytes):
-    """Sube skins/<slug>.png al repo publico. Devuelve la URL raw."""
+    """Sube skins/<user>/<ts>.png al repo publico (carpeta por usuario,
+    versiones por timestamp — nunca se pisan). Devuelve la URL raw."""
     slug = skin_slug(user)
-    path = f"{SKINS_DIR}/{slug}.png"
-    # sha previo si ya existia (para reemplazo)
-    sha = None
-    r = requests.get(f"{GH_API}/contents/{path}?ref={BRANCH}", headers=gh_headers(), timeout=15)
-    if r.status_code == 200:
-        sha = r.json().get("sha")
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    path = f"{SKINS_DIR}/{slug}/{ts}.png"
     payload = {
         "message": f"skin upload: {user}",
         "content": base64.b64encode(png_bytes).decode("ascii"),
         "branch": BRANCH,
     }
-    if sha:
-        payload["sha"] = sha
     r = requests.put(f"{GH_API}/contents/{path}", headers=gh_headers(), json=payload, timeout=30)
     if r.status_code not in (200, 201):
         raise RuntimeError(f"GitHub {r.status_code}: {r.text[:300]}")
-    return f"{SKINS_RAW}/{slug}.png"
+    return f"{SKINS_RAW}/{slug}/{ts}.png"
 
 
 EXTERNAL_RE = re.compile(r"^https?://(?!raw\.githubusercontent\.com)", re.I)
@@ -759,37 +754,36 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
             pass
 
 
-# ── /skins myownskins — galería de tus PNGs en mfaccs/skins/ ──
+# ── /skins myownskins — galería de tus PNGs en mfaccs/skins/<user>/ ──
 def gh_list_user_skins(user):
-    """Lista las skins del usuario en skins/: el archivo activo (slug exacto)
-    y cualquier versión histórica <slug>N.png (shusukegxe1.png, …2, etc.).
+    """Lista todas las skins del usuario en skins/<slug>/*.png.
     Devuelve [(nombre, url_raw, fecha)] ordenadas por fecha (nueva primero)."""
     slug = skin_slug(user)
-    r = requests.get(f"{GH_API}/contents/{SKINS_DIR}?ref={BRANCH}",
+    r = requests.get(f"{GH_API}/contents/{SKINS_DIR}/{slug}?ref={BRANCH}",
                      headers=gh_headers(), timeout=15)
+    if r.status_code == 404:
+        return []
     if r.status_code != 200:
         raise RuntimeError(f"GitHub {r.status_code}: {r.text[:200]}")
-    items = r.json()
-    pat = re.compile(rf"^{re.escape(slug)}\d*\.png$", re.I)
     out = []
-    for it in items:
-        if it.get("type") != "file" or not pat.match(it.get("name", "")):
+    for it in r.json():
+        if it.get("type") != "file" or not it.get("name", "").lower().endswith(".png"):
             continue
-        out.append((it["name"], it.get("download_url") or f"{SKINS_RAW}/{it['name']}",
+        out.append((it["name"], it.get("download_url") or f"{SKINS_RAW}/{slug}/{it['name']}",
                     it.get("commit", {}).get("date") or it.get("last_commit", {}).get("date", "")))
     out.sort(key=lambda t: t[2], reverse=True)
     return out
 
 
 class OwnSkinsView(discord.ui.View):
-    """Embed paginado con preview: cada skin mostrada con su URL raw."""
+    """Embed paginado con preview y botón para activar la skin mostrada."""
     def __init__(self, user, skins):
-        super().__init__(timeout=180)
+        super().__init__(timeout=300)
         self.user = user
         self.skins = skins
         self.page = 0
 
-    async def update(self, interaction: discord.Interaction):
+    def embed(self):
         name, url, date = self.skins[self.page]
         total = len(self.skins)
         d = date[:10].replace("-", "/") if date else "?"
@@ -800,10 +794,16 @@ class OwnSkinsView(discord.ui.View):
                         f"Subida: {d} · {self.page + 1}/{total}",
             color=0x8B5CF6)
         emb.set_image(url=url)
-        emb.set_footer(text="La activa es la que tu username dice — usa /skinupload o el panel para cambiarla")
+        emb.set_footer(text="Use the ⚡ button to make the shown skin your active one")
+        return emb
+
+    def sync_buttons(self):
         self.prev.disabled = self.page == 0
-        self.next.disabled = self.page == total - 1
-        await interaction.response.edit_message(embed=emb, view=self)
+        self.next.disabled = self.page == len(self.skins) - 1
+
+    async def update(self, interaction: discord.Interaction):
+        self.sync_buttons()
+        await interaction.response.edit_message(embed=self.embed(), view=self)
 
     @discord.ui.button(label="◀", style=discord.ButtonStyle.gray)
     async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -817,9 +817,26 @@ class OwnSkinsView(discord.ui.View):
             self.page += 1
         await self.update(interaction)
 
+    @discord.ui.button(label="⚡ Activate", style=discord.ButtonStyle.green)
+    async def activate(self, interaction: discord.Interaction, button: discord.ui.Button):
+        _name, url, _d = self.skins[self.page]
+        try:
+            data, sha = gh_download()
+            if data is None:
+                await interaction.response.send_message("Remote accounts.json corrupt.", ephemeral=True)
+                return
+            data.setdefault("players", {})[self.user] = {"skin": url}
+            commit = gh_upload(data, sha, f"skinbot: activate {self.user} from gallery")
+            emb = self.embed()
+            emb.set_footer(text=f"✔ Active — {commit or 'applied'}")
+            await interaction.response.edit_message(embed=emb, view=self)
+        except Exception as e:
+            warn("activate falló:", repr(e))
+            await interaction.response.send_message(f"Error: {e}", ephemeral=True)
 
-@tree.command(name="skins", description="Ver tus skins subidas al repo (menú con preview)")
-@app_commands.describe(what="myownskins — tus PNGs en mfaccs/skins/")
+
+@tree.command(name="skins", description="Ver tus skins subidas al repo (galería con preview)")
+@app_commands.describe(what="myownskins — tus PNGs en mfaccs/skins/<tu-user>/")
 @app_commands.choices(what=[app_commands.Choice(name="myownskins", value="myownskins")])
 async def skins_cmd(interaction: discord.Interaction, what: str = "myownskins"):
     if not in_channel(interaction):
@@ -828,7 +845,7 @@ async def skins_cmd(interaction: discord.Interaction, what: str = "myownskins"):
     await interaction.response.defer(ephemeral=True)
 
     try:
-        # cuenta vinculada → username → slug
+        # cuenta vinculada → username → carpeta skins/<slug>/
         did = str(interaction.user.id)
         recs = load_local_accounts().get("cuentas", {})
         mine = [u for u, r in recs.items() if r.get("discord_id") == did]
@@ -841,20 +858,13 @@ async def skins_cmd(interaction: discord.Interaction, what: str = "myownskins"):
         skins = gh_list_user_skins(user)
         if not skins:
             await interaction.followup.send(
-                f"No skins found for `{user}` in `skins/`.\n"
+                f"No skins found for `{user}` in `skins/{skin_slug(user)}/`.\n"
                 "Upload one with `/skinupload` or from the client panel.")
             return
 
         view = OwnSkinsView(user, skins)
-        name, url, date = skins[0]
-        d = date[:10].replace("-", "/") if date else "?"
-        emb = discord.Embed(
-            title=f"🎨 Skins de {user}",
-            description=f"**{name}**\n`{url}`\nSubida: {d} · 1/{len(skins)}",
-            color=0x8B5CF6)
-        emb.set_image(url=url)
-        emb.set_footer(text="La activa es la que tu username dice — usa /skinupload o el panel para cambiarla")
-        await interaction.followup.send(embed=emb, view=view)
+        view.sync_buttons()
+        await interaction.followup.send(embed=view.embed(), view=view)
 
     except Exception as e:
         warn("skins falló:", repr(e))
