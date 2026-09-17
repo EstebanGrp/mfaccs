@@ -1,7 +1,8 @@
 {
   "players": {
     "shusukegxe_": {
-      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe/20260917-035956.png"
+      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe/20260917-035956.png",
+      "rank": "dev"
     },
     "itzesteban": {
       "skin": "custom:mf_dev_itzesteban"
@@ -19,13 +20,28 @@
       "skin": "custom:mf_eve"
     },
     "angrywolfx": {
-      "skin": "https://t.novaskin.me/31c57b47825af14e2ea709d08b2a817f7db1b3fba6df7f996a6151993feaf85a"
+      "skin": "https://t.novaskin.me/31c57b47825af14e2ea709d08b2a817f7db1b3fba6df7f996a6151993feaf85a",
+      "rank": "dev"
     },
     "phongnguyen": {
       "skin": "file:///C:/Users/hiep/Downloads/char.png"
     },
     "not_senpai": {
       "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/not_senpai/20260916-212032.png"
+    },
+    "6eb7369a-551e-406a-9a63-6db7a358e1e5": {
+      "rank": "dev",
+      "name": "ShusukeGxE_"
+    }
+  },
+  "ranks": {
+    "dev": {
+      "label": "DEV",
+      "color": "#00FFFF",
+      "bold": true,
+      "glow": true,
+      "shiny": true,
+      "priorityBase": "eternus"
     }
   }
 }
