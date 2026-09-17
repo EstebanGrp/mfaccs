@@ -74,8 +74,11 @@ ACCOUNTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mf_acc
 
 GH_API = f"https://api.github.com/repos/{REPO}"
 RAW_URL = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{ACCOUNTS_PATH}"
-SKINS_DIR = "skins"  # repo público: mfaccs/skins/<user>.png
+SKINS_DIR = "skins"  # repo público: mfaccs/skins/<user>/<ts>.png
 SKINS_RAW = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{SKINS_DIR}"
+# Push de updates en vivo: el client escucha este topic via SSE y recarga
+# la DB al instante (sin esperar su polling de respaldo).
+SKINS_PUSH_TOPIC = os.environ.get("MFSB_PUSH_TOPIC", "mf-skins-updates-v1")
 
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 SKIN_RE = re.compile(r"^[a-z0-9_]+$", re.I)
@@ -230,7 +233,25 @@ def gh_upload(data, sha, msg):
     )
     if r.status_code not in (200, 201):
         raise RuntimeError(f"GitHub {r.status_code}: {r.text[:300]}")
+    commit_sha = r.json().get("commit", {}).get("sha", "")
+    push_skins_update(commit_sha, msg)
     return r.json().get("commit", {}).get("html_url", "")
+
+
+def push_skins_update(commit_sha, msg):
+    """Avisa por ntfy que la DB cambió — los clients conectados recargan al
+    instante via SSE. Fire-and-forget: si ntfy falla, el polling de respaldo
+    del client (cada 60s) cubre."""
+    try:
+        requests.post(
+            f"https://ntfy.sh/{SKINS_PUSH_TOPIC}",
+            data=f"{commit_sha} {msg}".encode("utf-8")[:512],
+            headers={"Title": "mfaccs update", "Priority": "default",
+                     "Tags": "art"},
+            timeout=8,
+        )
+    except Exception as e:
+        warn("ntfy push falló:", repr(e))
 
 
 def skin_slug(user):
