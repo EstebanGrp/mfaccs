@@ -339,7 +339,7 @@ def validate_skin_value(value):
 
 
 # ── cuentas MiniFeather (local, con contraseñas hasheadas) ──
-USER_RE = re.compile(r"^[a-z0-9_]{3,16}$", re.I)
+USER_RE = re.compile(r"^[a-z0-9_]{3,50}$", re.I)
 
 # En GitHub Actions el disco es efímero: el archivo de cuentas vive en un
 # REPO PRIVADO y se sincroniza por la API de contents (igual que skins).
@@ -1295,7 +1295,7 @@ async def on_message(message: discord.Message):
 class CreateAccountModal(discord.ui.Modal, title="Create MiniFeather account"):
     username = discord.ui.TextInput(
         label="Miniblox username", placeholder="Your exact in-game username",
-        min_length=3, max_length=16)
+        min_length=3, max_length=50)
     password = discord.ui.TextInput(
         label="Password", placeholder="minimum 6 characters",
         min_length=6, max_length=64)
@@ -1309,7 +1309,7 @@ class CreateAccountModal(discord.ui.Modal, title="Create MiniFeather account"):
 
         if not USER_RE.match(username):
             await interaction.response.send_message(
-                "Username must be 3-16 chars [a-z0-9_].", ephemeral=True)
+                "Username must be 3-50 chars [a-z0-9_].", ephemeral=True)
             return
         key = username.lower()
         if key in cuentas:
