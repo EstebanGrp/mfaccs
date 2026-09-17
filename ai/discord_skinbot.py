@@ -1330,6 +1330,116 @@ class SetSkinModal(discord.ui.Modal, title="Choose skin for your account"):
             pass
 
 
+class RankSetDefModal(discord.ui.Modal, title="Define / update a rank"):
+    key = discord.ui.TextInput(
+        label="Rank key", placeholder="dev / vip / mvp ...",
+        min_length=2, max_length=16)
+    label = discord.ui.TextInput(
+        label="Label shown in-game", placeholder="DEV / VIP / MVP",
+        min_length=1, max_length=16)
+    color = discord.ui.TextInput(
+        label="Color (hex)", placeholder="#00FFFF", default="#00FFFF",
+        min_length=4, max_length=9)
+    effects = discord.ui.TextInput(
+        label="Effects", placeholder="glow:yes shiny:yes bold:yes base:eternus",
+        default="glow:yes shiny:yes bold:yes base:eternus",
+        min_length=1, max_length=100, required=False)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not is_admin(interaction):
+            await interaction.response.send_message("Admin only.", ephemeral=True)
+            return
+        key = str(self.key.value).strip().lower()
+        label = str(self.label.value).strip()
+        color = str(self.color.value).strip()
+        fx = str(self.effects.value or "").strip()
+        if not re.match(r"^[a-z0-9_-]{2,16}$", key):
+            await interaction.response.send_message("Key must be [a-z0-9_-] 2-16.", ephemeral=True)
+            return
+        if not re.match(r"^#[0-9a-fA-F]{3,8}$", color):
+            await interaction.response.send_message("Color must be hex (#00FFFF).", ephemeral=True)
+            return
+        d = {"label": label.upper(), "color": color,
+             "bold": True, "glow": True, "shiny": True, "priorityBase": "eternus"}
+        for tok in fx.split():
+            if ":" not in tok:
+                continue
+            n, v = tok.split(":", 1)
+            n = n.lower()
+            if n in ("bold", "glow", "shiny"):
+                d[n] = v.strip().lower() in ("yes", "true", "on", "1")
+            elif n == "base":
+                d["priorityBase"] = v.strip() or "eternus"
+        data, sha = gh_download()
+        if data is None:
+            await interaction.response.send_message("Remote accounts.json corrupt.", ephemeral=True)
+            return
+        data.setdefault("ranks", {})[key] = d
+        commit = gh_upload(data, sha, f"skinbot: panel rank setdef {key}")
+        await interaction.response.send_message(
+            f"Rank **{key}** → `[{d['label']}]` {d['color']} · "
+            f"glow={'on' if d['glow'] else 'off'} shiny={'on' if d['shiny'] else 'off'} "
+            f"bold={'on' if d['bold'] else 'off'}\nApplies in-game live.\n{commit}",
+            ephemeral=True)
+
+    async def on_error(self, interaction, error):
+        warn("modal rank setdef falló:", repr(error))
+        try:
+            await interaction.response.send_message(f"Error: {error}", ephemeral=True)
+        except Exception:
+            pass
+
+
+class RankPlayerModal(discord.ui.Modal, title="Assign / remove a rank"):
+    player = discord.ui.TextInput(
+        label="Player (username or uuid)", placeholder="shusukegxe_ / 6eb7369a-...",
+        min_length=2, max_length=40)
+    key = discord.ui.TextInput(
+        label="Rank key (empty = remove)", placeholder="dev / vip — leave empty to remove",
+        max_length=16, required=False)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not is_admin(interaction):
+            await interaction.response.send_message("Admin only.", ephemeral=True)
+            return
+        pk = str(self.player.value).strip()
+        rk = str(self.key.value or "").strip().lower()
+        data, sha = gh_download()
+        if data is None:
+            await interaction.response.send_message("Remote accounts.json corrupt.", ephemeral=True)
+            return
+        players = data.setdefault("players", {})
+        entry = dict(players.get(pk, {}))
+        if not rk:
+            if not entry.get("rank"):
+                await interaction.response.send_message(
+                    f"`{pk}` has no rank.", ephemeral=True)
+                return
+            del entry["rank"]
+            players[pk] = entry
+            commit = gh_upload(data, sha, f"skinbot: panel rank remove {pk}")
+            await interaction.response.send_message(
+                f"Rank removed from **{pk}**.\n{commit}", ephemeral=True)
+            return
+        if rk not in data.get("ranks", {}):
+            await interaction.response.send_message(
+                f"Rank `{rk}` doesn't exist — define it first with **Rank defs**.", ephemeral=True)
+            return
+        entry["rank"] = rk
+        players[pk] = entry
+        commit = gh_upload(data, sha, f"skinbot: panel rank {pk} = {rk}")
+        await interaction.response.send_message(
+            f"Rank `{rk}` assigned to **{pk}** — applies live in-game.\n{commit}",
+            ephemeral=True)
+
+    async def on_error(self, interaction, error):
+        warn("modal rank player falló:", repr(error))
+        try:
+            await interaction.response.send_message(f"Error: {error}", ephemeral=True)
+        except Exception:
+            pass
+
+
 class PanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)  # persistent
@@ -1349,6 +1459,39 @@ class PanelView(discord.ui.View):
             await interaction.response.send_message("Channel not authorized.", ephemeral=True)
             return
         await interaction.response.send_modal(SetSkinModal())
+
+    @discord.ui.button(label="My skins", style=discord.ButtonStyle.blurple,
+                       emoji="🖼️", custom_id="mfsb:gallery")
+    async def gallery(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # misma lógica que /skins myownskins
+        if not in_channel(interaction):
+            await interaction.response.send_message("Channel not authorized.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        try:
+            did = str(interaction.user.id)
+            recs = load_local_accounts().get("cuentas", {})
+            mine = [u for u, r in recs.items() if r.get("discord_id") == did]
+            if not mine:
+                await interaction.followup.send(
+                    "You need a MiniFeather account first — press **Create account**.")
+                return
+            user = mine[0]
+            skins = gh_list_user_skins(user)
+            if not skins:
+                await interaction.followup.send(
+                    f"No skins found for `{user}` in `skins/{skin_slug(user)}/`.\n"
+                    "Upload one with `/skinupload` or from the client panel.")
+                return
+            view = OwnSkinsView(user, skins)
+            view.sync_buttons()
+            await interaction.followup.send(embed=view.embed(), view=view)
+        except Exception as e:
+            warn("panel gallery falló:", repr(e))
+            try:
+                await interaction.followup.send(f"Error: {e}")
+            except Exception:
+                pass
 
     @discord.ui.button(label="My account", style=discord.ButtonStyle.gray,
                        emoji="ℹ️", custom_id="mfsb:info")
@@ -1375,23 +1518,75 @@ class PanelView(discord.ui.View):
             f"Creator: <@{entry.get('creator', '0')}>",
             ephemeral=True)
 
+    @discord.ui.button(label="Rank defs", style=discord.ButtonStyle.gray,
+                       emoji="🏷️", custom_id="mfsb:rankdef", row=1)
+    async def rankdef(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not is_admin(interaction):
+            await interaction.response.send_message("Admin only.", ephemeral=True)
+            return
+        await interaction.response.send_modal(RankSetDefModal())
+
+    @discord.ui.button(label="Assign rank", style=discord.ButtonStyle.gray,
+                       emoji="🎖️", custom_id="mfsb:rankset", row=1)
+    async def rankset(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not is_admin(interaction):
+            await interaction.response.send_message("Admin only.", ephemeral=True)
+            return
+        await interaction.response.send_modal(RankPlayerModal())
+
+    @discord.ui.button(label="Ranks list", style=discord.ButtonStyle.gray,
+                       emoji="📋", custom_id="mfsb:ranklist", row=1)
+    async def ranklist(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not is_admin(interaction):
+            await interaction.response.send_message("Admin only.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        try:
+            data, _sha = gh_download()
+            if data is None:
+                await interaction.followup.send("Remote accounts.json corrupt.")
+                return
+            ranks = data.get("ranks", {})
+            if not ranks:
+                await interaction.followup.send("No ranks defined — use **Rank defs**.")
+                return
+            lines = []
+            for k, d in sorted(ranks.items()):
+                eff = ", ".join(
+                    f"{n}={'on' if d.get(n, True) else 'off'}" for n in ("bold", "glow", "shiny"))
+                lines.append(f"**{k}** → `[{d.get('label', k).upper()}]` `{d.get('color', '?')}` "
+                             f"({eff}, base={d.get('priorityBase', 'eternus')})")
+            asign = [f"`{u}` ({d['rank']})" for u, d in data.get("players", {}).items() if d.get("rank")]
+            await interaction.followup.send(
+                "**Rank defs:**\n" + "\n".join(lines) +
+                ("\n\n**Assigned to:**\n" + ", ".join(asign) if asign else ""))
+        except Exception as e:
+            warn("panel ranklist falló:", repr(e))
+            try:
+                await interaction.followup.send(f"Error: {e}")
+            except Exception:
+                pass
+
 
 PANEL_EMBED = discord.Embed(
-    title="🪶 MiniFeather — Accounts & Skins",
+    title="🪶 MiniFeather — Accounts, Skins & Ranks",
     description=(
         "Create your MiniFeather account (password-protected, linked to your Discord) "
         "and choose the skin others will see in-game.\n\n"
         "**Upload your own skin:** use `/skinupload` with a PNG attached "
-        "(square or 2:1, 64–2048px).\n\n"
+        "(square or 2:1, 64–2048px), or manage them in **My skins**.\n\n"
         "**Skin formats (Set skin):**\n"
         "`custom:mf_...` — client custom id\n"
         "`chris`, `bob` — Miniblox vanilla\n"
         "`devs/itzesteban` — pack path\n"
-        "`https://...png` — absolute URL"
+        "`https://...png` — absolute URL\n\n"
+        "**Ranks (admin):** define custom in-game tags with color and effects "
+        "(glow / shiny / bold) and assign them to players — they apply live "
+        "without reloading the game."
     ),
     color=0x5865F2,
 )
-PANEL_EMBED.set_footer(text="Skin changes reach the game within 5 minutes")
+PANEL_EMBED.set_footer(text="Skin & rank changes reach the game in seconds")
 
 
 @tree.command(name="panel", description="Panel de cuentas y skins de MiniFeather")
