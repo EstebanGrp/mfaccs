@@ -36,7 +36,7 @@
   },
   "ranks": {
     "dev": {
-      "label": "DEV",
+      "label": "MF DEV",
       "color": "#00FFFF",
       "bold": true,
       "glow": true,
@@ -44,7 +44,7 @@
       "priorityBase": "eternus"
     },
     "immortal": {
-      "label": "[MF IMMORTAL]",
+      "label": "MF IMMORTAL",
       "color": "#D7942D",
       "bold": true,
       "glow": true,
@@ -52,7 +52,7 @@
       "priorityBase": "eternus"
     },
     "mfeternus": {
-      "label": "[MF ETERNUS]",
+      "label": "MF ETERNUS",
       "color": "#ff0000",
       "bold": true,
       "glow": true,
