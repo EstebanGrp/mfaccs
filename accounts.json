@@ -63,7 +63,7 @@
       "priorityBase": "eternus"
     },
     "owner": {
-      "label": "[MFOWNER]",
+      "label": "MFOWNER",
       "color": "#FFD700",
       "bold": true,
       "glow": true,
