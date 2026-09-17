@@ -106,11 +106,28 @@ CONGRATS = [
     "Perhaps the point was never to reach the end, but to see what you became along the way.",
 ]
 
-async def notify_new_account(username, creator: discord.abc.User):
+async def log_channel():
+    """Canal de logs con fetch forzado: get_channel() devuelve None al
+    arranque (caché fría) o si el canal no está en la caché — eso hacía
+    que las notificaciones de cuentas creadas nunca llegaran."""
     try:
         ch = bot.get_channel(int(LOG_CHANNEL_ID))
+        if ch is not None:
+            return ch
+    except (ValueError, TypeError):
+        return None
+    try:
+        return await bot.fetch_channel(int(LOG_CHANNEL_ID))
+    except Exception as e:
+        warn(f"log_channel: no se pudo obtener {LOG_CHANNEL_ID}:", repr(e))
+        return None
+
+
+async def notify_new_account(username, creator: discord.abc.User):
+    try:
+        ch = await log_channel()
         if ch is None:
-            ch = await bot.fetch_channel(int(LOG_CHANNEL_ID))
+            return
         msg = random.choice(CONGRATS)
         await ch.send(
             f"🆕 New MiniFeather account: **{username}** — created by {creator.mention}\n{msg}"
@@ -472,6 +489,13 @@ def in_channel(i) -> bool:
     return str(i.channel_id) == CHANNEL_ID
 
 
+async def fup(interaction, *args, **kwargs):
+    """followup.send SIEMPRE efímero: las respuestas del bot son solo
+    para quien invocó (salvo los anuncios del panel, que van aparte)."""
+    kwargs.setdefault("ephemeral", True)
+    return await interaction.followup.send(*args, **kwargs)
+
+
 @bot.event
 async def on_ready():
     # registrar la vista persistente: sin esto, los botones de paneles
@@ -548,8 +572,9 @@ async def handle_client_account_create(req):
         except Exception as e:
             warn("client create: skin inicial falló:", repr(e))
     try:
-        ch = bot.get_channel(int(LOG_CHANNEL_ID)) or await bot.fetch_channel(int(LOG_CHANNEL_ID))
-        await ch.send(f"🆕 Account **{username}** created from the MiniFeather Client")
+        ch = await log_channel()
+        if ch is not None:
+            await ch.send(f"🆕 Account **{username}** created from the MiniFeather Client")
     except Exception as e:
         warn("notify client create falló:", repr(e))
     warn(f"client create OK: {key}")
@@ -628,26 +653,26 @@ async def skin_cmd(interaction: discord.Interaction,
         if act == "sync":
             data, sha = gh_download()
             if data is None:
-                await interaction.followup.send("accounts.json remoto corrupto.")
+                await fup(interaction, "accounts.json remoto corrupto.")
                 return
             commit = gh_upload(data, sha, "skinbot: sync")
-            await interaction.followup.send(f"Re-subido tal cual.\n{commit}")
+            await fup(interaction, f"Re-subido tal cual.\n{commit}")
             return
 
         if act == "reload":
             data, _sha = gh_download()
             if data is None:
-                await interaction.followup.send("accounts.json remoto corrupto.")
+                await fup(interaction, "accounts.json remoto corrupto.")
                 return
             n = len(data.get("players", {}))
-            await interaction.followup.send(f"Descartado. Remote tiene {n} entradas.")
+            await fup(interaction, f"Descartado. Remote tiene {n} entradas.")
             return
 
         # ── acciones con jugador ──
         if act in ("set", "seturl", "remove"):
             key = (player or "").strip()
             if not key:
-                await interaction.followup.send("Falta <player>.")
+                await fup(interaction, "Falta <player>.")
                 return
             is_uuid = bool(UUID_RE.match(key))
             kdisp = "uuid" if is_uuid else "username"
@@ -655,28 +680,28 @@ async def skin_cmd(interaction: discord.Interaction,
 
             data, sha = gh_download()
             if data is None:
-                await interaction.followup.send("accounts.json remoto corrupto.")
+                await fup(interaction, "accounts.json remoto corrupto.")
                 return
             players = data.setdefault("players", {})
 
             if act == "remove":
                 if key not in players:
-                    await interaction.followup.send(f"No hay override para `{key}`.")
+                    await fup(interaction, f"No hay override para `{key}`.")
                     return
                 del players[key]
                 commit = gh_upload(data, sha, f"skinbot: remove {key}")
-                await interaction.followup.send(f"Quitado ({kdisp}).\n{commit}")
+                await fup(interaction, f"Quitado ({kdisp}).\n{commit}")
                 return
 
             value = (skin if act == "set" else url).strip()
             if act == "seturl":
                 if not re.match(r"^https?://", value, re.I):
-                    await interaction.followup.send("seturl exige http(s)://…")
+                    await fup(interaction, "seturl exige http(s)://…")
                     return
             else:
                 ok, why = validate_skin_value(value)
                 if not ok:
-                    await interaction.followup.send(f"Skin inválida ({why}).")
+                    await fup(interaction, f"Skin inválida ({why}).")
                     return
             # re-host de URLs externas (CORS desde miniblox.io)
             rehosted = False
@@ -685,7 +710,7 @@ async def skin_cmd(interaction: discord.Interaction,
                 if raw:
                     value, rehosted = raw, True
                 else:
-                    await interaction.followup.send(
+                    await fup(interaction, 
                         "No pude descargar esa imagen (¿es un link directo a PNG?). "
                         "Sube el archivo con /skinupload.")
                     return
@@ -697,13 +722,13 @@ async def skin_cmd(interaction: discord.Interaction,
             commit = gh_upload(data, sha, f"skinbot: set {key} = {value[:40]}")
             oldinfo = f" (antes: `{old}`)" if old and old != value else ""
             rh = "\nRe-hosteada en nuestro repo (sin CORS)." if rehosted else ""
-            await interaction.followup.send(
+            await fup(interaction, 
                 f"OK — `{key}` ({kdisp}) → `{value}`{oldinfo}{rh}\n{commit}")
 
         elif act == "list":
             data, _sha = gh_download()
             if data is None:
-                await interaction.followup.send("accounts.json remoto corrupto.")
+                await fup(interaction, "accounts.json remoto corrupto.")
                 return
             entries = sorted(data.get("players", {}).items())
             PER = 15
@@ -717,16 +742,16 @@ async def skin_cmd(interaction: discord.Interaction,
                 if len(sv) > 42:
                     sv = sv[:39] + "…"
                 lines.append(f"`{k}` → {sv}")
-            await interaction.followup.send("\n".join(lines))
+            await fup(interaction, "\n".join(lines))
 
         else:
-            await interaction.followup.send(
+            await fup(interaction, 
                 "Acción desconocida. Usa set / seturl / remove / list / reload / sync.")
 
     except Exception as e:
         warn("comando falló:", repr(e))
         try:
-            await interaction.followup.send(f"Error: {e}")
+            await fup(interaction, f"Error: {e}")
         except Exception:
             pass
 
@@ -746,7 +771,7 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
         recs = load_local_accounts().get("cuentas", {})
         mine = [u for u, r in recs.items() if r.get("discord_id") == did]
         if not mine:
-            await interaction.followup.send(
+            await fup(interaction, 
                 "You need a MiniFeather account first — use the panel's **Create account** button."
             )
             return
@@ -754,10 +779,10 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
 
         # 2. validar el archivo
         if (image.content_type or "").lower() not in ("image/png",):
-            await interaction.followup.send("File must be a PNG.")
+            await fup(interaction, "File must be a PNG.")
             return
         if image.size > 16 * 1024 * 1024:
-            await interaction.followup.send("Max 16 MB.")
+            await fup(interaction, "Max 16 MB.")
             return
         png = await image.read()
 
@@ -765,7 +790,7 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
         raw_url = gh_upload_png(user, png)
         data, sha = gh_download()
         if data is None:
-            await interaction.followup.send("Remote accounts.json corrupt.")
+            await fup(interaction, "Remote accounts.json corrupt.")
             return
         players = data.setdefault("players", {})
         # preservar campos extra (rank, name) al reescribir la entrada
@@ -773,14 +798,14 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
         entry["skin"] = raw_url
         players[user] = entry
         commit = gh_upload(data, sha, f"skinbot: skinupload {user}")
-        await interaction.followup.send(
+        await fup(interaction, 
             f"Skin uploaded — `{user}` → `{raw_url}`\nVisible in-game in ≤5 min.\n{commit}"
         )
 
     except Exception as e:
         warn("skinupload falló:", repr(e))
         try:
-            await interaction.followup.send(f"Error: {e}")
+            await fup(interaction, f"Error: {e}")
         except Exception:
             pass
 
@@ -884,26 +909,26 @@ async def skins_cmd(interaction: discord.Interaction, what: str = "myownskins"):
         recs = load_local_accounts().get("cuentas", {})
         mine = [u for u, r in recs.items() if r.get("discord_id") == did]
         if not mine:
-            await interaction.followup.send(
+            await fup(interaction, 
                 "You need a MiniFeather account first — use the panel's **Create account** button.")
             return
         user = mine[0]
 
         skins = gh_list_user_skins(user)
         if not skins:
-            await interaction.followup.send(
+            await fup(interaction, 
                 f"No skins found for `{user}` in `skins/{skin_slug(user)}/`.\n"
                 "Upload one with `/skinupload` or from the client panel.")
             return
 
         view = OwnSkinsView(user, skins)
         view.sync_buttons()
-        await interaction.followup.send(embed=view.embed(), view=view)
+        await fup(interaction, embed=view.embed(), view=view)
 
     except Exception as e:
         warn("skins falló:", repr(e))
         try:
-            await interaction.followup.send(f"Error: {e}")
+            await fup(interaction, f"Error: {e}")
         except Exception:
             pass
 
@@ -940,11 +965,11 @@ async def rank_cmd(interaction: discord.Interaction, action: str = "list",
         if action == "list":
             data, _sha = gh_download()
             if data is None:
-                await interaction.followup.send("Remote accounts.json corrupt.")
+                await fup(interaction, "Remote accounts.json corrupt.")
                 return
             ranks = data.get("ranks", {})
             if not ranks:
-                await interaction.followup.send("No ranks defined. Use `/rank setdef`.")
+                await fup(interaction, "No ranks defined. Use `/rank setdef`.")
                 return
             lines = []
             for k, d in sorted(ranks.items()):
@@ -953,21 +978,21 @@ async def rank_cmd(interaction: discord.Interaction, action: str = "list",
                 lines.append(f"**{k}** → [{d.get('label', k).upper()}] `{d.get('color', '?')}` "
                              f"({eff}, base={d.get('priorityBase', 'eternus')})")
             asign = [f"`{u}` ({d['rank']})" for u, d in data.get("players", {}).items() if d.get("rank")]
-            await interaction.followup.send(
+            await fup(interaction, 
                 "**Rank defs:**\n" + "\n".join(lines) +
                 ("\n\n**Asignados:**\n" + ", ".join(asign) if asign else ""))
             return
 
         if action == "setdef":
             if not key:
-                await interaction.followup.send("Falta <key> (nombre del rango).")
+                await fup(interaction, "Falta <key> (nombre del rango).")
                 return
             if color and not re.match(r"^#[0-9a-fA-F]{3,8}$", color):
-                await interaction.followup.send("Color debe ser hex (#00FFFF).")
+                await fup(interaction, "Color debe ser hex (#00FFFF).")
                 return
             data, sha = gh_download()
             if data is None:
-                await interaction.followup.send("Remote accounts.json corrupt.")
+                await fup(interaction, "Remote accounts.json corrupt.")
                 return
             ranks = data.setdefault("ranks", {})
             old = ranks.get(key.lower(), {})
@@ -981,7 +1006,7 @@ async def rank_cmd(interaction: discord.Interaction, action: str = "list",
             }
             ranks[key.lower()] = d
             commit = gh_upload(data, sha, f"skinbot: rank setdef {key.lower()}")
-            await interaction.followup.send(
+            await fup(interaction, 
                 f"Rank **{key.lower()}** definido: `[{d['label']}]` color {d['color']}, "
                 f"glow={'on' if d['glow'] else 'off'}, shiny={'on' if d['shiny'] else 'off'}.\n"
                 f"Aplica en vivo en ≤5 min.\n{commit}")
@@ -989,41 +1014,41 @@ async def rank_cmd(interaction: discord.Interaction, action: str = "list",
 
         # set / remove sobre un jugador
         if not player:
-            await interaction.followup.send("Falta <player> (username o uuid).")
+            await fup(interaction, "Falta <player> (username o uuid).")
             return
         data, sha = gh_download()
         if data is None:
-            await interaction.followup.send("Remote accounts.json corrupt.")
+            await fup(interaction, "Remote accounts.json corrupt.")
             return
         players = data.setdefault("players", {})
         pk = player.strip()
         if action == "set":
             if not key:
-                await interaction.followup.send("Falta <key> (rango a asignar).")
+                await fup(interaction, "Falta <key> (rango a asignar).")
                 return
             if key.lower() not in data.get("ranks", {}):
-                await interaction.followup.send(f"El rango `{key}` no existe — créalo con `/rank setdef`.")
+                await fup(interaction, f"El rango `{key}` no existe — créalo con `/rank setdef`.")
                 return
             entry = dict(players.get(pk, {}))
             entry["rank"] = key.lower()
             players[pk] = entry
             commit = gh_upload(data, sha, f"skinbot: rank {pk} = {key.lower()}")
-            await interaction.followup.send(
+            await fup(interaction, 
                 f"Rank `{key.lower()}` asignado a **{pk}** — visible en vivo en ≤5 min.\n{commit}")
         else:  # remove
             entry = dict(players.get(pk, {}))
             if not entry.get("rank"):
-                await interaction.followup.send(f"`{pk}` no tiene rango.")
+                await fup(interaction, f"`{pk}` no tiene rango.")
                 return
             del entry["rank"]
             players[pk] = entry
             commit = gh_upload(data, sha, f"skinbot: rank remove {pk}")
-            await interaction.followup.send(f"Rank quitado a **{pk}**.\n{commit}")
+            await fup(interaction, f"Rank quitado a **{pk}**.\n{commit}")
 
     except Exception as e:
         warn("rank falló:", repr(e))
         try:
-            await interaction.followup.send(f"Error: {e}")
+            await fup(interaction, f"Error: {e}")
         except Exception:
             pass
 
@@ -1094,10 +1119,10 @@ async def mfaccount_cmd(interaction: discord.Interaction,
             "creator": uid,
         }
         save_local_accounts(data)
-        await notify_new_account(username, interaction.user)
         await interaction.response.send_message(
             f"Cuenta `{username}` creada y vinculada a {interaction.user.mention}. "
             "La contraseña vive hasheada (PBKDF2) solo en la PC del bot.", ephemeral=True)
+        await notify_new_account(username, interaction.user)
         return
 
     # ── acciones que requieren dueño o admin ──
@@ -1112,89 +1137,89 @@ async def mfaccount_cmd(interaction: discord.Interaction,
             key = (username or "").strip().lower()      # cuenta MiniFeather
             target = (account or "").strip()            # id de Discord
             if not re.match(r"^\d{5,25}$", target):
-                await interaction.followup.send(
+                await fup(interaction, 
                     "Uso: /mfaccount link username:<cuenta> account:<discord_id>")
                 return
             if key not in cuentas:
-                await interaction.followup.send(f"No existe la cuenta `{key}`.")
+                await fup(interaction, f"No existe la cuenta `{key}`.")
                 return
             old = cuentas[key].get("discord_id")
             cuentas[key]["discord_id"] = target
             save_local_accounts(data)
             oldinfo = f" (antes <@{old}>)" if old and old != target else ""
-            await interaction.followup.send(
+            await fup(interaction, 
                 f"`{key}` vinculada a <@{target}>{oldinfo}.")
 
         elif act == "unlink":
             key = (username or "").strip().lower()
             if key not in cuentas:
-                await interaction.followup.send(f"No existe la cuenta `{key}`.")
+                await fup(interaction, f"No existe la cuenta `{key}`.")
                 return
             cuentas[key].pop("discord_id", None)
             cuentas[key].pop("discord_tag", None)
             save_local_accounts(data)
-            await interaction.followup.send(f"`{key}` desvinculada de Discord.")
+            await fup(interaction, f"`{key}` desvinculada de Discord.")
 
         elif act == "passwd":
             key = (username or "").strip().lower()
             if key not in cuentas:
-                await interaction.followup.send(f"No existe la cuenta `{key}`.")
+                await fup(interaction, f"No existe la cuenta `{key}`.")
                 return
             if len(password) < 6:
-                await interaction.followup.send("Contraseña mínima: 6 caracteres.")
+                await fup(interaction, "Contraseña mínima: 6 caracteres.")
                 return
             cuentas[key]["hash"] = hash_password(password)
             save_local_accounts(data)
-            await interaction.followup.send(f"Contraseña de `{key}` actualizada.")
+            await fup(interaction, f"Contraseña de `{key}` actualizada.")
 
         elif act == "info":
             key = (username or "").strip().lower()
             if not key:
                 name, c = find_mine()
                 if not name:
-                    await interaction.followup.send("No tienes cuenta vinculada.")
+                    await fup(interaction, "No tienes cuenta vinculada.")
                     return
                 key, entry = name, c
             elif key in cuentas:
                 entry = cuentas[key]
             else:
-                await interaction.followup.send(f"No existe la cuenta `{key}`.")
+                await fup(interaction, f"No existe la cuenta `{key}`.")
                 return
             did = entry.get("discord_id")
             lines = [f"**{key}**",
                      f"Discord: {f'<@{did}>' if did else '—'}",
                      f"Creada: <t:{entry.get('created', 0)}:R>",
                      f"Creador: <@{entry.get('creator', '0')}>"]
-            await interaction.followup.send("\n".join(lines))
+            await fup(interaction, "\n".join(lines))
 
         elif act == "list":
             if not cuentas:
-                await interaction.followup.send("Sin cuentas aún.")
+                await fup(interaction, "Sin cuentas aún.")
                 return
             lines = ["**Cuentas MiniFeather** — %d:" % len(cuentas)]
             for name, c in sorted(cuentas.items()):
                 did = c.get("discord_id")
                 who = f"<@{did}>" if did else "sin vincular"
                 lines.append(f"`{name}` → {who}")
-            await interaction.followup.send("\n".join(lines))
+            await fup(interaction, "\n".join(lines))
 
         elif act == "delete":
             key = (username or "").strip().lower()
             if key not in cuentas:
-                await interaction.followup.send(f"No existe la cuenta `{key}`.")
+                await fup(interaction, f"No existe la cuenta `{key}`.")
                 return
             del cuentas[key]
             save_local_accounts(data)
-            await interaction.followup.send(f"Cuenta `{key}` eliminada.")
+            await fup(interaction, f"Cuenta `{key}` eliminada.")
 
         else:
-            await interaction.followup.send(
+            await fup(interaction, 
                 "Acción desconocida. create / link / unlink / passwd / info / list / delete")
 
     except Exception as e:
         warn("mfaccount falló:", repr(e))
         try:
-            await interaction.followup.send(f"Error: {e}")
+            await fup(interaction, f"Error: {e}")
         except Exception:
             pass
 
@@ -1309,10 +1334,12 @@ class CreateAccountModal(discord.ui.Modal, title="Create MiniFeather account"):
             await interaction.response.send_message(
                 f"Could not save (accounts repo?): {e}", ephemeral=True)
             return
-        await notify_new_account(username, interaction.user)
+        # responder PRIMERO (la interacción expira a los 3s) y notificar
+        # al canal de logs después, en background
         await interaction.response.send_message(
             f"Account **{username}** created and linked to {interaction.user.mention} ✅",
             ephemeral=True)
+        await notify_new_account(username, interaction.user)
 
     async def on_error(self, interaction, error):
         warn("modal create falló:", repr(error))
@@ -1358,14 +1385,14 @@ class SetSkinModal(discord.ui.Modal, title="Choose skin for your account"):
                 if raw:
                     value, rehosted = raw, True
                 else:
-                    await interaction.followup.send(
+                    await fup(interaction, 
                         "Couldn't download that image (is it a direct PNG link?). "
                         "Try uploading the file with `/skinupload` instead.",
                         ephemeral=True)
                     return
             sdata, sha = gh_download()
             if sdata is None:
-                await interaction.followup.send(
+                await fup(interaction, 
                     "Remote accounts.json is corrupt.", ephemeral=True)
                 return
             players = sdata.setdefault("players", {})
@@ -1539,23 +1566,23 @@ class PanelView(discord.ui.View):
             recs = load_local_accounts().get("cuentas", {})
             mine = [u for u, r in recs.items() if r.get("discord_id") == did]
             if not mine:
-                await interaction.followup.send(
+                await fup(interaction, 
                     "You need a MiniFeather account first — press **Create account**.")
                 return
             user = mine[0]
             skins = gh_list_user_skins(user)
             if not skins:
-                await interaction.followup.send(
+                await fup(interaction, 
                     f"No skins found for `{user}` in `skins/{skin_slug(user)}/`.\n"
                     "Upload one with `/skinupload` or from the client panel.")
                 return
             view = OwnSkinsView(user, skins)
             view.sync_buttons()
-            await interaction.followup.send(embed=view.embed(), view=view)
+            await fup(interaction, embed=view.embed(), view=view)
         except Exception as e:
             warn("panel gallery falló:", repr(e))
             try:
-                await interaction.followup.send(f"Error: {e}")
+                await fup(interaction, f"Error: {e}")
             except Exception:
                 pass
 
@@ -1632,11 +1659,11 @@ class PanelView(discord.ui.View):
         try:
             data, _sha = gh_download()
             if data is None:
-                await interaction.followup.send("Remote accounts.json corrupt.")
+                await fup(interaction, "Remote accounts.json corrupt.")
                 return
             ranks = data.get("ranks", {})
             if not ranks:
-                await interaction.followup.send("No ranks defined — use **Rank defs**.")
+                await fup(interaction, "No ranks defined — use **Rank defs**.")
                 return
             lines = []
             for k, d in sorted(ranks.items()):
@@ -1645,13 +1672,13 @@ class PanelView(discord.ui.View):
                 lines.append(f"**{k}** → `[{d.get('label', k).upper()}]` `{d.get('color', '?')}` "
                              f"({eff}, base={d.get('priorityBase', 'eternus')})")
             asign = [f"`{u}` ({d['rank']})" for u, d in data.get("players", {}).items() if d.get("rank")]
-            await interaction.followup.send(
+            await fup(interaction, 
                 "**Rank defs:**\n" + "\n".join(lines) +
                 ("\n\n**Assigned to:**\n" + ", ".join(asign) if asign else ""))
         except Exception as e:
             warn("panel ranklist falló:", repr(e))
             try:
-                await interaction.followup.send(f"Error: {e}")
+                await fup(interaction, f"Error: {e}")
             except Exception:
                 pass
 
