@@ -759,6 +759,111 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
             pass
 
 
+# ── /skins myownskins — galería de tus PNGs en mfaccs/skins/ ──
+def gh_list_user_skins(user):
+    """Lista las skins del usuario en skins/: el archivo activo (slug exacto)
+    y cualquier versión histórica <slug>N.png (shusukegxe1.png, …2, etc.).
+    Devuelve [(nombre, url_raw, fecha)] ordenadas por fecha (nueva primero)."""
+    slug = skin_slug(user)
+    r = requests.get(f"{GH_API}/contents/{SKINS_DIR}?ref={BRANCH}",
+                     headers=gh_headers(), timeout=15)
+    if r.status_code != 200:
+        raise RuntimeError(f"GitHub {r.status_code}: {r.text[:200]}")
+    items = r.json()
+    pat = re.compile(rf"^{re.escape(slug)}\d*\.png$", re.I)
+    out = []
+    for it in items:
+        if it.get("type") != "file" or not pat.match(it.get("name", "")):
+            continue
+        out.append((it["name"], it.get("download_url") or f"{SKINS_RAW}/{it['name']}",
+                    it.get("commit", {}).get("date") or it.get("last_commit", {}).get("date", "")))
+    out.sort(key=lambda t: t[2], reverse=True)
+    return out
+
+
+class OwnSkinsView(discord.ui.View):
+    """Embed paginado con preview: cada skin mostrada con su URL raw."""
+    def __init__(self, user, skins):
+        super().__init__(timeout=180)
+        self.user = user
+        self.skins = skins
+        self.page = 0
+
+    async def update(self, interaction: discord.Interaction):
+        name, url, date = self.skins[self.page]
+        total = len(self.skins)
+        d = date[:10].replace("-", "/") if date else "?"
+        emb = discord.Embed(
+            title=f"🎨 Skins de {self.user}",
+            description=f"**{name}**\n"
+                        f"`{url}`\n"
+                        f"Subida: {d} · {self.page + 1}/{total}",
+            color=0x8B5CF6)
+        emb.set_image(url=url)
+        emb.set_footer(text="La activa es la que tu username dice — usa /skinupload o el panel para cambiarla")
+        self.prev.disabled = self.page == 0
+        self.next.disabled = self.page == total - 1
+        await interaction.response.edit_message(embed=emb, view=self)
+
+    @discord.ui.button(label="◀", style=discord.ButtonStyle.gray)
+    async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.page > 0:
+            self.page -= 1
+        await self.update(interaction)
+
+    @discord.ui.button(label="▶", style=discord.ButtonStyle.gray)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.page < len(self.skins) - 1:
+            self.page += 1
+        await self.update(interaction)
+
+
+@tree.command(name="skins", description="Ver tus skins subidas al repo (menú con preview)")
+@app_commands.describe(what="myownskins — tus PNGs en mfaccs/skins/")
+@app_commands.choices(what=[app_commands.Choice(name="myownskins", value="myownskins")])
+async def skins_cmd(interaction: discord.Interaction, what: str = "myownskins"):
+    if not in_channel(interaction):
+        await interaction.response.send_message("Unauthorized channel.", ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        # cuenta vinculada → username → slug
+        did = str(interaction.user.id)
+        recs = load_local_accounts().get("cuentas", {})
+        mine = [u for u, r in recs.items() if r.get("discord_id") == did]
+        if not mine:
+            await interaction.followup.send(
+                "You need a MiniFeather account first — use the panel's **Create account** button.")
+            return
+        user = mine[0]
+
+        skins = gh_list_user_skins(user)
+        if not skins:
+            await interaction.followup.send(
+                f"No skins found for `{user}` in `skins/`.\n"
+                "Upload one with `/skinupload` or from the client panel.")
+            return
+
+        view = OwnSkinsView(user, skins)
+        name, url, date = skins[0]
+        d = date[:10].replace("-", "/") if date else "?"
+        emb = discord.Embed(
+            title=f"🎨 Skins de {user}",
+            description=f"**{name}**\n`{url}`\nSubida: {d} · 1/{len(skins)}",
+            color=0x8B5CF6)
+        emb.set_image(url=url)
+        emb.set_footer(text="La activa es la que tu username dice — usa /skinupload o el panel para cambiarla")
+        await interaction.followup.send(embed=emb, view=view)
+
+    except Exception as e:
+        warn("skins falló:", repr(e))
+        try:
+            await interaction.followup.send(f"Error: {e}")
+        except Exception:
+            pass
+
+
 @tree.command(name="mfaccount", description="Cuentas MiniFeather con contraseña, vinculadas a Discord")
 @app_commands.describe(
     action="create / link / unlink / passwd / info / list / delete",
