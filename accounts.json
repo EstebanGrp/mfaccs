@@ -50,6 +50,14 @@
       "glow": true,
       "shiny": true,
       "priorityBase": "eternus"
+    },
+    "mfeternus": {
+      "label": "[MF ETERNUS]",
+      "color": "#ff0000",
+      "bold": true,
+      "glow": true,
+      "shiny": true,
+      "priorityBase": "eternus"
     }
   }
 }
