@@ -540,7 +540,10 @@ async def handle_client_account_create(req):
             if ok_skin:
                 sdata, sha = gh_download()
                 if sdata is not None:
-                    sdata.setdefault("players", {})[key] = {"skin": skin}
+                    players = sdata.setdefault("players", {})
+                    entry = {k: v for k, v in players.get(key, {}).items() if k != "skin"}
+                    entry["skin"] = skin
+                    players[key] = entry
                     gh_upload(sdata, sha, f"skinbot: client create {key}")
         except Exception as e:
             warn("client create: skin inicial falló:", repr(e))
@@ -687,7 +690,10 @@ async def skin_cmd(interaction: discord.Interaction,
                         "Sube el archivo con /skinupload.")
                     return
             old = players.get(key, {}).get("skin")
-            players[key] = {"skin": value}
+            # preservar campos extra (rank, name) al reescribir la entrada
+            entry = {k: v for k, v in players.get(key, {}).items() if k != "skin"}
+            entry["skin"] = value
+            players[key] = entry
             commit = gh_upload(data, sha, f"skinbot: set {key} = {value[:40]}")
             oldinfo = f" (antes: `{old}`)" if old and old != value else ""
             rh = "\nRe-hosteada en nuestro repo (sin CORS)." if rehosted else ""
@@ -761,7 +767,11 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
         if data is None:
             await interaction.followup.send("Remote accounts.json corrupt.")
             return
-        data.setdefault("players", {})[user] = {"skin": raw_url}
+        players = data.setdefault("players", {})
+        # preservar campos extra (rank, name) al reescribir la entrada
+        entry = {k: v for k, v in players.get(user, {}).items() if k != "skin"}
+        entry["skin"] = raw_url
+        players[user] = entry
         commit = gh_upload(data, sha, f"skinbot: skinupload {user}")
         await interaction.followup.send(
             f"Skin uploaded — `{user}` → `{raw_url}`\nVisible in-game in ≤5 min.\n{commit}"
@@ -846,7 +856,10 @@ class OwnSkinsView(discord.ui.View):
             if data is None:
                 await interaction.response.send_message("Remote accounts.json corrupt.", ephemeral=True)
                 return
-            data.setdefault("players", {})[self.user] = {"skin": url}
+            players = data.setdefault("players", {})
+            entry = {k: v for k, v in players.get(self.user, {}).items() if k != "skin"}
+            entry["skin"] = url
+            players[self.user] = entry
             commit = gh_upload(data, sha, f"skinbot: activate {self.user} from gallery")
             emb = self.embed()
             emb.set_footer(text=f"✔ Active — {commit or 'applied'}")
@@ -889,6 +902,126 @@ async def skins_cmd(interaction: discord.Interaction, what: str = "myownskins"):
 
     except Exception as e:
         warn("skins falló:", repr(e))
+        try:
+            await interaction.followup.send(f"Error: {e}")
+        except Exception:
+            pass
+
+
+# ── /rank — gestionar rangos custom definidos en accounts.json ──
+@tree.command(name="rank", description="Administrar rangos custom (defs + asignación por jugador)")
+@app_commands.describe(
+    action="setdef=definir/actualizar un rango, list=ver todos, set=asignar a jugador, remove=quitar",
+    key="Nombre clave del rango (ej: dev, vip, mvp)",
+    label="Etiqueta a mostrar (ej: DEV, VIP)",
+    color="Color hex (#00FFFF)",
+    glow="Efecto glow (default true)",
+    shiny="Efecto shiny (default true)",
+    bold="Negrita (default true)",
+    priority_base="Rango vanilla del que hereda prioridad (default eternus)",
+    player="Username o uuid del jugador (para set/remove)",
+)
+@app_commands.choices(action=[
+    app_commands.Choice(name="setdef", value="setdef"),
+    app_commands.Choice(name="list", value="list"),
+    app_commands.Choice(name="set", value="set"),
+    app_commands.Choice(name="remove", value="remove"),
+])
+async def rank_cmd(interaction: discord.Interaction, action: str = "list",
+                   key: str = None, label: str = None, color: str = None,
+                   glow: bool = None, shiny: bool = None, bold: bool = None,
+                   priority_base: str = None, player: str = None):
+    if not in_channel(interaction):
+        await interaction.response.send_message("Unauthorized channel.", ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        if action == "list":
+            data, _sha = gh_download()
+            if data is None:
+                await interaction.followup.send("Remote accounts.json corrupt.")
+                return
+            ranks = data.get("ranks", {})
+            if not ranks:
+                await interaction.followup.send("No ranks defined. Use `/rank setdef`.")
+                return
+            lines = []
+            for k, d in sorted(ranks.items()):
+                eff = ", ".join(
+                    f"{n}={'on' if d.get(n, True) else 'off'}" for n in ("bold", "glow", "shiny"))
+                lines.append(f"**{k}** → [{d.get('label', k).upper()}] `{d.get('color', '?')}` "
+                             f"({eff}, base={d.get('priorityBase', 'eternus')})")
+            asign = [f"`{u}` ({d['rank']})" for u, d in data.get("players", {}).items() if d.get("rank")]
+            await interaction.followup.send(
+                "**Rank defs:**\n" + "\n".join(lines) +
+                ("\n\n**Asignados:**\n" + ", ".join(asign) if asign else ""))
+            return
+
+        if action == "setdef":
+            if not key:
+                await interaction.followup.send("Falta <key> (nombre del rango).")
+                return
+            if color and not re.match(r"^#[0-9a-fA-F]{3,8}$", color):
+                await interaction.followup.send("Color debe ser hex (#00FFFF).")
+                return
+            data, sha = gh_download()
+            if data is None:
+                await interaction.followup.send("Remote accounts.json corrupt.")
+                return
+            ranks = data.setdefault("ranks", {})
+            old = ranks.get(key.lower(), {})
+            d = {
+                "label": (label or old.get("label") or key).upper(),
+                "color": color or old.get("color") or "#00FFFF",
+                "bold": bold if bold is not None else old.get("bold", True),
+                "glow": glow if glow is not None else old.get("glow", True),
+                "shiny": shiny if shiny is not None else old.get("shiny", True),
+                "priorityBase": priority_base or old.get("priorityBase", "eternus"),
+            }
+            ranks[key.lower()] = d
+            commit = gh_upload(data, sha, f"skinbot: rank setdef {key.lower()}")
+            await interaction.followup.send(
+                f"Rank **{key.lower()}** definido: `[{d['label']}]` color {d['color']}, "
+                f"glow={'on' if d['glow'] else 'off'}, shiny={'on' if d['shiny'] else 'off'}.\n"
+                f"Aplica en vivo en ≤5 min.\n{commit}")
+            return
+
+        # set / remove sobre un jugador
+        if not player:
+            await interaction.followup.send("Falta <player> (username o uuid).")
+            return
+        data, sha = gh_download()
+        if data is None:
+            await interaction.followup.send("Remote accounts.json corrupt.")
+            return
+        players = data.setdefault("players", {})
+        pk = player.strip()
+        if action == "set":
+            if not key:
+                await interaction.followup.send("Falta <key> (rango a asignar).")
+                return
+            if key.lower() not in data.get("ranks", {}):
+                await interaction.followup.send(f"El rango `{key}` no existe — créalo con `/rank setdef`.")
+                return
+            entry = dict(players.get(pk, {}))
+            entry["rank"] = key.lower()
+            players[pk] = entry
+            commit = gh_upload(data, sha, f"skinbot: rank {pk} = {key.lower()}")
+            await interaction.followup.send(
+                f"Rank `{key.lower()}` asignado a **{pk}** — visible en vivo en ≤5 min.\n{commit}")
+        else:  # remove
+            entry = dict(players.get(pk, {}))
+            if not entry.get("rank"):
+                await interaction.followup.send(f"`{pk}` no tiene rango.")
+                return
+            del entry["rank"]
+            players[pk] = entry
+            commit = gh_upload(data, sha, f"skinbot: rank remove {pk}")
+            await interaction.followup.send(f"Rank quitado a **{pk}**.\n{commit}")
+
+    except Exception as e:
+        warn("rank falló:", repr(e))
         try:
             await interaction.followup.send(f"Error: {e}")
         except Exception:
@@ -1171,7 +1304,10 @@ class SetSkinModal(discord.ui.Modal, title="Choose skin for your account"):
                 return
             players = sdata.setdefault("players", {})
             old = players.get(key, {}).get("skin")
-            players[key] = {"skin": value}
+            # preservar campos extra (rank, name) al reescribir la entrada
+            entry = {k: v for k, v in players.get(key, {}).items() if k != "skin"}
+            entry["skin"] = value
+            players[key] = entry
             commit = gh_upload(sdata, sha, f"skinbot: panel set {key} = {value[:40]}")
             oldinfo = f" (before: `{old}`)" if old and old != value else ""
             rh = "\nRe-hosted in our repo (CORS-safe)." if rehosted else ""
