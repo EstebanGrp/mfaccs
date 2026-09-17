@@ -64,7 +64,11 @@ GH_TOKEN = os.environ.get("MFSB_GH_TOKEN", "")
 REPO = os.environ.get("MFSB_REPO", "EstebanGrp/mfaccs")
 BRANCH = os.environ.get("MFSB_BRANCH", "main")
 ACCOUNTS_PATH = "accounts.json"
+# Admins: el secret MFSB_ADMINS (ids separados por coma) MÁS estos fijos
+# (respaldo para que nunca queden fuera si el env viene vacío).
+ADMINS_FALLBACK = ["1361713094916571177", "1305490991574290518"]
 ADMINS = [s.strip() for s in os.environ.get("MFSB_ADMINS", "").split(",") if s.strip()]
+ADMINS += [a for a in ADMINS_FALLBACK if a not in ADMINS]
 CHANNEL_ID = os.environ.get("MFSB_CHANNEL", "")
 # Canal SIEMPRE válido para anuncios de cuentas nuevas (respaldo si el
 # env MFSB_LOG_CHANNEL no está o trae basura)
