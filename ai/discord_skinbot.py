@@ -66,7 +66,10 @@ BRANCH = os.environ.get("MFSB_BRANCH", "main")
 ACCOUNTS_PATH = "accounts.json"
 ADMINS = [s.strip() for s in os.environ.get("MFSB_ADMINS", "").split(",") if s.strip()]
 CHANNEL_ID = os.environ.get("MFSB_CHANNEL", "")
-LOG_CHANNEL_ID = os.environ.get("MFSB_LOG_CHANNEL", "1549572492434346015")
+# Canal SIEMPRE válido para anuncios de cuentas nuevas (respaldo si el
+# env MFSB_LOG_CHANNEL no está o trae basura)
+ANNOUNCE_CHANNEL_FALLBACK = "1549572492434346015"
+LOG_CHANNEL_ID = os.environ.get("MFSB_LOG_CHANNEL", "") or ANNOUNCE_CHANNEL_FALLBACK
 
 # DB local de cuentas MiniFeather (NO va al repo público: contraseñas)
 #   ai/mf_accounts.json  → { "cuentas": { "<usuario>": {...} } }
@@ -1533,6 +1536,56 @@ class RankPlayerModal(discord.ui.Modal, title="Assign / remove a rank"):
             pass
 
 
+class UploadSkinModal(discord.ui.Modal, title="Upload skin (PNG URL)"):
+    url = discord.ui.TextInput(
+        label="Direct PNG URL", placeholder="https://.../skin.png",
+        min_length=8, max_length=400)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        uid = str(interaction.user.id)
+        recs = load_local_accounts().get("cuentas", {})
+        mine = [u for u, r in recs.items() if r.get("discord_id") == uid]
+        if not mine:
+            await interaction.response.send_message(
+                "You need a MiniFeather account first — press **Create account**.",
+                ephemeral=True)
+            return
+        user = mine[0]
+        url = str(self.url.value).strip()
+        await interaction.response.defer(ephemeral=True)
+        raw = rehost_external_skin(user, url)
+        if not raw:
+            await fup(interaction,
+                "Couldn't download that image (is it a direct PNG link?). "
+                "Use **Upload skin → Attach file** instead.")
+            return
+        try:
+            data, sha = gh_download()
+            if data is None:
+                await fup(interaction, "Remote accounts.json corrupt.")
+                return
+            players = data.setdefault("players", {})
+            entry = {k: v for k, v in players.get(user, {}).items() if k != "skin"}
+            entry["skin"] = raw
+            players[user] = entry
+            commit = gh_upload(data, sha, f"skinbot: panel upload-url {user}")
+            await fup(interaction,
+                f"Skin uploaded — `{user}` → `{raw}`\nVisible in-game in seconds.  {commit}")
+        except Exception as e:
+            warn("panel upload-url falló:", repr(e))
+            try:
+                await fup(interaction, f"Error: {e}")
+            except Exception:
+                pass
+
+    async def on_error(self, interaction, error):
+        warn("modal upload-url falló:", repr(error))
+        try:
+            await interaction.response.send_message(f"Error: {error}", ephemeral=True)
+        except Exception:
+            pass
+
+
 class PanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)  # persistent
@@ -1600,13 +1653,8 @@ class PanelView(discord.ui.View):
                 "You need a MiniFeather account first — press **Create account**.",
                 ephemeral=True)
             return
-        # mensaje visible con hint: el usuario responde subiendo el PNG
         await interaction.response.send_message(
-            f"{interaction.user.mention} send your skin PNG here (**Reply** to this "
-            "message or just attach it in this channel within 2 min) — "
-            "square or 2:1 PNG, 64–2048px. It will become your in-game skin.",
-            ephemeral=False)
-        _PENDING_UPLOADS[interaction.user.id] = int(time.time())
+            "📤 **Upload your skin** — pick how:", view=UploadSkinView(), ephemeral=True)
 
     @discord.ui.button(label="My account", style=discord.ButtonStyle.gray,
                        emoji="ℹ️", custom_id="mfsb:info")
@@ -1688,8 +1736,9 @@ PANEL_EMBED = discord.Embed(
     description=(
         "Create your MiniFeather account (password-protected, linked to your Discord) "
         "and choose the skin others will see in-game.\n\n"
-        "**Upload your own skin:** press **Upload skin** and send your PNG in this "
-        "channel (square or 2:1, 64–2048px), or use `/skinupload`. Manage them in **My skins**.\n\n"
+        "**Upload your own skin:** press **Upload skin** — pick **By URL** (paste a "
+        "direct PNG link) or **Attach file** (send the PNG in this channel). "
+        "Manage them in **My skins**.\n\n"
         "**Skin formats (Set skin):**\n"
         "`custom:mf_...` — client custom id\n"
         "`chris`, `bob` — Miniblox vanilla\n"
@@ -1702,6 +1751,25 @@ PANEL_EMBED = discord.Embed(
     color=0x5865F2,
 )
 PANEL_EMBED.set_footer(text="Skin & rank changes reach the game in seconds")
+
+
+class UploadSkinView(discord.ui.View):
+    """GUI de subida: URL directa (modal) o archivo adjunto (upload nativo)."""
+    def __init__(self):
+        super().__init__(timeout=180)
+
+    @discord.ui.button(label="By URL", style=discord.ButtonStyle.blurple, emoji="🔗")
+    async def by_url(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(UploadSkinModal())
+
+    @discord.ui.button(label="Attach file", style=discord.ButtonStyle.green, emoji="📎")
+    async def attach(self, interaction: discord.Interaction, button: discord.ui.Button):
+        _PENDING_UPLOADS[interaction.user.id] = int(time.time())
+        await interaction.response.send_message(
+            f"{interaction.user.mention} send your skin PNG here (**Reply** to this "
+            "message or just attach it in this channel within 2 min) — "
+            "square or 2:1 PNG, 64–2048px. It will become your in-game skin.",
+            ephemeral=False)
 
 
 @tree.command(name="panel", description="Panel de cuentas y skins de MiniFeather")
