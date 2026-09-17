@@ -42,6 +42,14 @@
       "glow": true,
       "shiny": true,
       "priorityBase": "eternus"
+    },
+    "immortal": {
+      "label": "[IMMORTAL]",
+      "color": "#D7942D",
+      "bold": true,
+      "glow": true,
+      "shiny": true,
+      "priorityBase": "eternus"
     }
   }
 }
