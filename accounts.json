@@ -61,6 +61,14 @@
       "glow": true,
       "shiny": true,
       "priorityBase": "eternus"
+    },
+    "owner": {
+      "label": "[MFOWNER]",
+      "color": "#FFD700",
+      "bold": true,
+      "glow": true,
+      "shiny": true,
+      "priorityBase": "eternus"
     }
   }
 }
