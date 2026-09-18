@@ -2,7 +2,8 @@
   "players": {
     "shusukegxe_": {
       "rank": "dev",
-      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe/20260916-212035.png"
+      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe/20260916-212035.png",
+      "cape": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/capes/shusukegxe/20260918-232550.png"
     },
     "itzesteban": {
       "skin": "custom:mf_dev_itzesteban"
