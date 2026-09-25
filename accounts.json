@@ -5,9 +5,6 @@
       "cape": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/capes/shusukegxe/20260918-232550.png",
       "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe/20260916-212035.png"
     },
-    "itzesteban": {
-      "skin": "custom:mf_dev_itzesteban"
-    },
     "nightrise": {
       "skin": "custom:mf_dev_nightrise"
     },
@@ -17,8 +14,8 @@
     "gab": {
       "skin": "custom:mf_dev_gab"
     },
-    "eve": {
-      "skin": "custom:mf_eve"
+    "xz_lilit_wolf_zx": {
+      "skin": "https://raw.githubusercontent.com/DevOfficial-Client/MiniFeather-Client/refs/heads/main/skins/devs/eve.png"
     },
     "angrywolfx": {
       "skin": "https://t.novaskin.me/31c57b47825af14e2ea709d08b2a817f7db1b3fba6df7f996a6151993feaf85a",
