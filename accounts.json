@@ -21,6 +21,10 @@
       "skin": "https://t.novaskin.me/31c57b47825af14e2ea709d08b2a817f7db1b3fba6df7f996a6151993feaf85a",
       "rank": "dev"
     },
+    "tsukyx": {
+      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/refs/heads/main/skins/tsukyx/7728def6a7cfab3e.png",
+      "rank": "mftester"
+    },
     "phongnguyen": {
       "skin": "file:///C:/Users/hiep/Downloads/char.png",
       "rank": "mfeternus"
@@ -63,14 +67,22 @@
       "shiny": true,
       "priorityBase": "eternus"
     },
-    "mfeternus": {
-      "label": "MFETERNUS",
-      "color": "#ff0000",
-      "bold": true,
-      "glow": true,
-      "shiny": true,
-      "priorityBase": "eternus"
-    },
+      "mfeternus": {
+        "label": "MFETERNUS",
+        "color": "#ff0000",
+        "bold": true,
+        "glow": true,
+        "shiny": true,
+        "priorityBase": "eternus"
+      },
+      "mftester": {
+        "label": "MFTESTER",
+        "color": "#00FFFF",
+        "bold": true,
+        "glow": true,
+        "shiny": true,
+        "priorityBase": "eternus"
+      },
     "owner": {
       "label": "MFOWNER",
       "color": "#FFD700",
