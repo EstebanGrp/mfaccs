@@ -2138,7 +2138,7 @@ class PanelView(discord.ui.View):
         if handler is None:
             await interaction.response.send_message("Unknown action.", ephemeral=True)
             return
-        await handler(interaction, None)
+        await handler.callback(interaction)
 
 
 PANEL_EMBED = discord.Embed(
