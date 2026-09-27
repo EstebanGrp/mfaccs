@@ -1454,6 +1454,8 @@ PET_VARIANTS = [
     ("brownmush", "Brown Mushroom", "brown mushroom pet"),
     ("gyarados", "Gyarados (mini)", "tiny gyarados flying circles"),
     ("gyarados_shiny", "Shiny Gyarados (mini)", "red shiny mini gyarados"),
+    ("knight", "Hollow Knight", "little ghost knight with nail"),
+    ("pichu", "Pichu", "tiny pika buddy"),
 ]
 
 
