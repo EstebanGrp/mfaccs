@@ -148,7 +148,7 @@ async def notify_new_account(username, creator: discord.abc.User):
             return
         msg = random.choice(CONGRATS)
         await ch.send(
-            f"🆕 New MiniFeather account: **{username}** — created by {creator.mention}\n{msg}"
+            f"New MiniFeather account: **{username}** — created by {creator.mention}\n{msg}"
         )
     except Exception as e:
         warn("notify_new_account falló:", repr(e))
@@ -593,7 +593,7 @@ async def handle_client_account_create(req):
     try:
         ch = await log_channel()
         if ch is not None:
-            await ch.send(f"🆕 Account **{username}** created from the MiniFeather Client")
+            await ch.send(f"Account **{username}** created from the MiniFeather Client")
     except Exception as e:
         warn("notify client create falló:", repr(e))
     warn(f"client create OK: {key}")
@@ -741,7 +741,7 @@ async def skin_cmd(interaction: discord.Interaction,
             commit = gh_upload(data, sha, f"skinbot: set {key} = {value[:40]}")
             oldinfo = f" (antes: `{old}`)" if old and old != value else ""
             rh = "\nRe-hosteada en nuestro repo (sin CORS)." if rehosted else ""
-            await fup(interaction, 
+            await fup(interaction,
                 f"OK — `{key}` ({kdisp}) → `{value}`{oldinfo}{rh}\n{commit}")
 
         elif act == "list":
@@ -817,8 +817,8 @@ async def skinupload_cmd(interaction: discord.Interaction, image: discord.Attach
         entry["skin"] = raw_url
         players[user] = entry
         commit = gh_upload(data, sha, f"skinbot: skinupload {user}")
-        await fup(interaction, 
-            f"Skin uploaded — `{user}` → `{raw_url}`\nVisible in-game in ≤5 min.\n{commit}"
+        await fup(interaction,
+            f"Skin uploaded — `{user}` → `{raw_url}`\nVisible in-game in ≤5 min. (＾▽＾)\n{commit}"
         )
 
     except Exception as e:
@@ -866,13 +866,13 @@ class OwnSkinsView(discord.ui.View):
         d = date[:10].replace("-", "/") if date else "?"
         what = "Cape" if self.kind == "cape" else "Skin"
         emb = discord.Embed(
-            title=f"{'🧣' if self.kind == 'cape' else '🎨'} {what}s de {self.user}",
+            title=f"{what}s de {self.user}",
             description=f"**{name}**\n"
                         f"`{url}`\n"
                         f"Subida: {d} · {self.page + 1}/{total}",
             color=0x8B5CF6)
         emb.set_image(url=url)
-        emb.set_footer(text=f"Use the ⚡ button to make the shown {self.kind} your active one")
+        emb.set_footer(text=f"Use the Activate button to make the shown {self.kind} your active one")
         return emb
 
     def sync_buttons(self):
@@ -883,19 +883,19 @@ class OwnSkinsView(discord.ui.View):
         self.sync_buttons()
         await interaction.response.edit_message(embed=self.embed(), view=self)
 
-    @discord.ui.button(label="◀", style=discord.ButtonStyle.gray)
+    @discord.ui.button(label="Prev", style=discord.ButtonStyle.gray)
     async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.page > 0:
             self.page -= 1
         await self.update(interaction)
 
-    @discord.ui.button(label="▶", style=discord.ButtonStyle.gray)
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.gray)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.page < len(self.skins) - 1:
             self.page += 1
         await self.update(interaction)
 
-    @discord.ui.button(label="⚡ Activate", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="Activate", style=discord.ButtonStyle.green)
     async def activate(self, interaction: discord.Interaction, button: discord.ui.Button):
         _name, url, _d = self.skins[self.page]
         try:
@@ -910,7 +910,7 @@ class OwnSkinsView(discord.ui.View):
             players[self.user] = entry
             commit = gh_upload(data, sha, f"skinbot: activate {field} {self.user} from gallery")
             emb = self.embed()
-            emb.set_footer(text=f"✔ Active — {commit or 'applied'}")
+            emb.set_footer(text=f"Active (＾▽＾) — {commit or 'applied'}")
             await interaction.response.edit_message(embed=emb, view=self)
         except Exception as e:
             warn("activate falló:", repr(e))
@@ -1003,8 +1003,8 @@ async def capeupload_cmd(interaction: discord.Interaction, image: discord.Attach
         entry["cape"] = raw_url
         players[user] = entry
         commit = gh_upload(data, sha, f"skinbot: capeupload {user}")
-        await fup(interaction, 
-            f"Cape uploaded — `{user}` → `{raw_url}`\nVisible in-game in ≤5 min.\n{commit}"
+        await fup(interaction,
+            f"Cape uploaded — `{user}` → `{raw_url}`\nVisible in-game in ≤5 min. (＾▽＾)\n{commit}"
         )
 
     except Exception as e:
@@ -1209,9 +1209,9 @@ async def rank_cmd(interaction: discord.Interaction, action: str = "list",
             }
             ranks[key.lower()] = d
             commit = gh_upload(data, sha, f"skinbot: rank setdef {key.lower()}")
-            await fup(interaction, 
+            await fup(interaction,
                 f"Rank **{key.lower()}** definido: `[{d['label']}]` color {d['color']}, "
-                f"glow={'on' if d['glow'] else 'off'}, shiny={'on' if d['shiny'] else 'off'}.\n"
+                f"glow={'on' if d['glow'] else 'off'}, shiny={'on' if d['shiny'] else 'off'}. (๑•̀ㅂ•́)و✧\n"
                 f"Aplica en vivo en ≤5 min.\n{commit}")
             return
 
@@ -1323,7 +1323,7 @@ async def mfaccount_cmd(interaction: discord.Interaction,
         }
         save_local_accounts(data)
         await interaction.response.send_message(
-            f"Cuenta `{username}` creada y vinculada a {interaction.user.mention}. "
+            f"Cuenta `{username}` creada y vinculada a {interaction.user.mention}. (・∀・)\n"
             "La contraseña vive hasheada (PBKDF2) solo en la PC del bot.", ephemeral=True)
         await notify_new_account(username, interaction.user)
         return
@@ -1429,6 +1429,91 @@ async def mfaccount_cmd(interaction: discord.Interaction,
 
 # ── /panel: GUI with buttons + modals ───────────────────────────
 
+# mascotas del client (AllayPets variants) — el menú del panel escribe el
+# campo "pet" en accounts.json y el client lo respeta si el jugador no
+# forzó una manualmente. 'random' = sorpresa en cada spawn.
+PET_VARIANTS = [
+    ("random", "Random", "A different pet every spawn"),
+    ("chorus", "Chorus Allay", "blue allay with chorus vibes"),
+    ("flower", "Flower Allay", "floral allay"),
+    ("sculk", "Deep Dark Allay", "sculk allay"),
+    ("cross", "Cross Allay", "cross-shaped allay"),
+    ("deepdark", "Dark Allay", "dark variant"),
+    ("vex", "Vex", "vex-like pet"),
+    ("redmush", "Red Mushroom", "red mushroom pet"),
+    ("brownmush", "Brown Mushroom", "brown mushroom pet"),
+    ("gyarados", "Gyarados (mini)", "tiny gyarados flying circles"),
+    ("gyarados_shiny", "Shiny Gyarados (mini)", "red shiny mini gyarados"),
+]
+
+
+class PetSelect(discord.ui.Select):
+    """Menú de mascotas: asigna pet=<key> al usuario (o a <player> si es
+    admin) y lo sube a accounts.json. Se usa dentro de PetsView."""
+    def __init__(self, user_key: str, current: str, is_admin: bool = False):
+        self.user_key = user_key
+        self.is_admin = is_admin
+        opts = []
+        for key, label, desc in PET_VARIANTS:
+            o = discord.SelectOption(label=label, value=key, description=desc)
+            if key == (current or ""):
+                o.default = True
+            opts.append(o)
+        super().__init__(
+            placeholder=f"Pick a pet for {user_key}…",
+            min_values=1, max_values=1, options=opts[:25])
+
+    async def callback(self, interaction: discord.Interaction):
+        # solo el dueño de la cuenta (o admin) puede cambiarla
+        uid = str(interaction.user.id)
+        if not self.is_admin:
+            recs = load_local_accounts().get("cuentas", {})
+            mine = [u for u, r in recs.items() if r.get("discord_id") == uid]
+            if not mine or mine[0] != self.user_key:
+                await interaction.response.send_message(
+                    "This is not your account panel — open your own with **Pick pet**.",
+                    ephemeral=True)
+                return
+        key = self.values[0]
+        try:
+            data, sha = gh_download()
+            if data is None:
+                await interaction.response.send_message(
+                    "Remote accounts.json corrupt.", ephemeral=True)
+                return
+            players = data.setdefault("players", {})
+            if key == "random":
+                entry = {k: v for k, v in players.get(self.user_key, {}).items() if k != "pet"}
+                players[self.user_key] = entry   # sin campo pet = random
+                label = "Random"
+            else:
+                entry = {k: v for k, v in players.get(self.user_key, {}).items() if k != "pet"}
+                entry["pet"] = key
+                players[self.user_key] = entry
+                label = next((l for k, l, _ in PET_VARIANTS if k == key), key)
+            commit = gh_upload(data, sha, f"skinbot: pet {self.user_key} = {key}")
+            await interaction.response.edit_message(
+                content=f"Pet for **{self.user_key}** → {label} ᕙ(`▽´)ᕗ\n"
+                        f"Visible in-game in ≤5 min (after re-entering the world).\n{commit or ''}",
+                view=None)
+        except Exception as e:
+            warn("pet select falló:", repr(e))
+            try:
+                await interaction.response.send_message(f"Error: {e}", ephemeral=True)
+            except Exception:
+                pass
+
+
+class PetsView(discord.ui.View):
+    def __init__(self, user_key: str, current: str, is_admin: bool = False):
+        super().__init__(timeout=180)
+        self.add_item(PetSelect(user_key, current, is_admin))
+
+
+def _pet_current_from(data_players: dict, key: str) -> str:
+    return (data_players.get(key, {}) or {}).get("pet", "") or "random"
+
+
 # usuarios que pulsaron "Upload skin" esperando su PNG (uid → timestamp)
 _PENDING_UPLOADS: dict = {}
 PENDING_UPLOAD_TTL = 120  # 2 min
@@ -1449,14 +1534,14 @@ async def _process_png_upload(message):
                 if (a.content_type or "").lower() == "image/png"), None)
     if not att:
         await message.reply(
-            "That's not a PNG — attach a `.png` file (square or 2:1, 64–2048px).",
+            "That's not a PNG — attach a `.png` file (square or 2:1, 64–2048px). (￣_￣)",
             mention_author=False)
         return True
     _PENDING_UPLOADS.pop(user_id, None)
     recs = load_local_accounts().get("cuentas", {})
     mine = [u for u, r in recs.items() if r.get("discord_id") == str(user_id)]
     if not mine:
-        await message.reply("No MiniFeather account found — press **Create account** first.",
+        await message.reply("No MiniFeather account found — press **Create account** first. (・_・;)",
                             mention_author=False)
         return True
     user = mine[0]
@@ -1478,7 +1563,7 @@ async def _process_png_upload(message):
         players[user] = entry
         gh_upload(data, sha, f"skinbot: panel upload {field} {user}")
         await message.reply(
-            f"{what} uploaded — `{user}` → `{raw_url}`\nVisible in-game in seconds.",
+            f"{what} uploaded — `{user}` → `{raw_url}`\nVisible in-game in seconds. (＾▽＾)",
             mention_author=False)
     except Exception as e:
         warn("panel upload falló:", repr(e))
@@ -1547,7 +1632,7 @@ class CreateAccountModal(discord.ui.Modal, title="Create MiniFeather account"):
         # responder PRIMERO (la interacción expira a los 3s) y notificar
         # al canal de logs después, en background
         await interaction.response.send_message(
-            f"Account **{username}** created and linked to {interaction.user.mention} ✅",
+            f"Account **{username}** created and linked to {interaction.user.mention} (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧",
             ephemeral=True)
         await notify_new_account(username, interaction.user)
 
@@ -1616,7 +1701,7 @@ class SetSkinModal(discord.ui.Modal, title="Choose skin for your account"):
             rh = "\nRe-hosted in our repo (CORS-safe)." if rehosted else ""
             send = interaction.followup.send if rehosted else interaction.response.send_message
             await send(
-                f"Skin of **{key}** → `{value}`{oldinfo}{rh}\nVisible in-game within 5 min.{f'  {commit}' if commit else ''}",
+                f"Skin of **{key}** → `{value}`{oldinfo}{rh}\nVisible in-game within 5 min. (＾▽＾){f'  {commit}' if commit else ''}",
                 ephemeral=True)
         except Exception as e:
             warn("panel skin falló:", repr(e))
@@ -1682,7 +1767,7 @@ class RankSetDefModal(discord.ui.Modal, title="Define / update a rank"):
         await interaction.response.send_message(
             f"Rank **{key}** → `[{d['label']}]` {d['color']} · "
             f"glow={'on' if d['glow'] else 'off'} shiny={'on' if d['shiny'] else 'off'} "
-            f"bold={'on' if d['bold'] else 'off'}\nApplies in-game live.\n{commit}",
+            f"bold={'on' if d['bold'] else 'off'}\nApplies in-game live. (๑•̀ㅂ•́)و✧\n{commit}",
             ephemeral=True)
 
     async def on_error(self, interaction, error):
@@ -1787,7 +1872,7 @@ class UploadSkinModal(discord.ui.Modal, title="Upload skin (PNG URL)"):
             players[user] = entry
             commit = gh_upload(data, sha, f"skinbot: panel upload-url {field} {user}")
             await fup(interaction,
-                f"{what} uploaded — `{user}` → `{raw}`\nVisible in-game in seconds.  {commit}")
+                f"{what} uploaded — `{user}` → `{raw}`\nVisible in-game in seconds. (＾▽＾)  {commit}")
         except Exception as e:
             warn("panel upload-url falló:", repr(e))
             try:
@@ -1808,7 +1893,7 @@ class PanelView(discord.ui.View):
         super().__init__(timeout=None)  # persistent
 
     @discord.ui.button(label="Create account", style=discord.ButtonStyle.green,
-                       emoji="🪶", custom_id="mfsb:crear")
+                       custom_id="mfsb:crear")
     async def crear(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not in_channel(interaction):
             await interaction.response.send_message("Channel not authorized.", ephemeral=True)
@@ -1816,7 +1901,7 @@ class PanelView(discord.ui.View):
         await interaction.response.send_modal(CreateAccountModal())
 
     @discord.ui.button(label="Set skin", style=discord.ButtonStyle.blurple,
-                       emoji="🎨", custom_id="mfsb:skin")
+                       custom_id="mfsb:skin")
     async def skin(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not in_channel(interaction):
             await interaction.response.send_message("Channel not authorized.", ephemeral=True)
@@ -1824,12 +1909,12 @@ class PanelView(discord.ui.View):
         await interaction.response.send_modal(SetSkinModal())
 
     @discord.ui.button(label="My skins", style=discord.ButtonStyle.blurple,
-                       emoji="🖼️", custom_id="mfsb:gallery")
+                       custom_id="mfsb:gallery")
     async def gallery(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._show_gallery(interaction, "skin")
 
     @discord.ui.button(label="My capes", style=discord.ButtonStyle.blurple,
-                       emoji="🧣", custom_id="mfsb:capes")
+                       custom_id="mfsb:capes")
     async def capes(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._show_gallery(interaction, "cape")
 
@@ -1866,7 +1951,7 @@ class PanelView(discord.ui.View):
                 pass
 
     @discord.ui.button(label="Upload skin", style=discord.ButtonStyle.green,
-                       emoji="📤", custom_id="mfsb:upload")
+                       custom_id="mfsb:upload")
     async def upload(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not in_channel(interaction):
             await interaction.response.send_message("Channel not authorized.", ephemeral=True)
@@ -1880,10 +1965,10 @@ class PanelView(discord.ui.View):
                 ephemeral=True)
             return
         await interaction.response.send_message(
-            "📤 **Upload your skin** — pick how:", view=UploadSkinView(), ephemeral=True)
+            "**Upload your skin** — pick how:", view=UploadSkinView(), ephemeral=True)
 
     @discord.ui.button(label="Upload cape", style=discord.ButtonStyle.green,
-                       emoji="🧣", custom_id="mfsb:uploadcape")
+                       custom_id="mfsb:uploadcape")
     async def uploadcape(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not in_channel(interaction):
             await interaction.response.send_message("Channel not authorized.", ephemeral=True)
@@ -1897,10 +1982,10 @@ class PanelView(discord.ui.View):
                 ephemeral=True)
             return
         await interaction.response.send_message(
-            "🧣 **Upload your cape** — pick how:", view=UploadSkinView("cape"), ephemeral=True)
+            "**Upload your cape** — pick how:", view=UploadSkinView("cape"), ephemeral=True)
 
     @discord.ui.button(label="My account", style=discord.ButtonStyle.gray,
-                       emoji="ℹ️", custom_id="mfsb:info")
+                       custom_id="mfsb:info")
     async def info(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not in_channel(interaction):
             await interaction.response.send_message("Channel not authorized.", ephemeral=True)
@@ -1925,7 +2010,7 @@ class PanelView(discord.ui.View):
             ephemeral=True)
 
     @discord.ui.button(label="Rank defs", style=discord.ButtonStyle.gray,
-                       emoji="🏷️", custom_id="mfsb:rankdef", row=1)
+                       custom_id="mfsb:rankdef", row=1)
     async def rankdef(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_admin(interaction):
             await interaction.response.send_message("Admin only.", ephemeral=True)
@@ -1933,7 +2018,7 @@ class PanelView(discord.ui.View):
         await interaction.response.send_modal(RankSetDefModal())
 
     @discord.ui.button(label="Assign rank", style=discord.ButtonStyle.gray,
-                       emoji="🎖️", custom_id="mfsb:rankset", row=1)
+                       custom_id="mfsb:rankset", row=1)
     async def rankset(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_admin(interaction):
             await interaction.response.send_message("Admin only.", ephemeral=True)
@@ -1941,7 +2026,7 @@ class PanelView(discord.ui.View):
         await interaction.response.send_modal(RankPlayerModal())
 
     @discord.ui.button(label="Ranks list", style=discord.ButtonStyle.gray,
-                       emoji="📋", custom_id="mfsb:ranklist", row=1)
+                       custom_id="mfsb:ranklist", row=1)
     async def ranklist(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_admin(interaction):
             await interaction.response.send_message("Admin only.", ephemeral=True)
@@ -1973,9 +2058,91 @@ class PanelView(discord.ui.View):
             except Exception:
                 pass
 
+    @discord.ui.button(label="Pick pet", style=discord.ButtonStyle.green,
+                       custom_id="mfsb:pet", row=2)
+    async def pick_pet(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not in_channel(interaction):
+            await interaction.response.send_message("Channel not authorized.", ephemeral=True)
+            return
+        # cuenta vinculada del que pulsa (admins: admin-pick con /pet)
+        did = str(interaction.user.id)
+        recs = load_local_accounts().get("cuentas", {})
+        mine = [u for u, r in recs.items() if r.get("discord_id") == did]
+        if not mine:
+            await interaction.response.send_message(
+                "You need a MiniFeather account first — press **Create account**.",
+                ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        try:
+            user = mine[0]
+            data, _sha = gh_download()
+            current = _pet_current_from(data.get("players", {}) if data else {}, user)
+            await fup(interaction, f"**Pick your pet, {user}!** (｡•̀ᴗ-)✧",
+                      view=PetsView(user, current, is_admin=False))
+        except Exception as e:
+            warn("panel pick_pet falló:", repr(e))
+            try:
+                await fup(interaction, f"Error: {e}")
+            except Exception:
+                pass
+
+    # ── menú desplegable: todas las acciones del panel en un solo select ──
+    # reusa los handlers de los botones (ellos responden la interacción:
+    # modal / defer+followup), así el callback del select no responde nada
+    @discord.ui.select(
+        placeholder="Menu — pick an action…",
+        custom_id="mfsb:menu",
+        row=2,
+        min_values=1, max_values=1,
+        options=[
+            discord.SelectOption(label="Create account", value="create",
+                                 description="New MiniFeather account linked to your Discord"),
+            discord.SelectOption(label="Set skin", value="setskin",
+                                 description="custom:mf_..., vanilla, pack path or URL"),
+            discord.SelectOption(label="My skins", value="myskins",
+                                 description="Gallery of your uploaded skins"),
+            discord.SelectOption(label="My capes", value="mycapes",
+                                 description="Gallery of your uploaded capes"),
+            discord.SelectOption(label="Upload skin", value="uploadskin",
+                                 description="By URL or attaching a PNG"),
+            discord.SelectOption(label="Upload cape", value="uploadcape",
+                                 description="By URL or attaching a PNG"),
+            discord.SelectOption(label="My account", value="info",
+                                 description="Your linked account info"),
+            discord.SelectOption(label="Pick pet", value="pickpet",
+                                 description="Choose your in-game pet"),
+            discord.SelectOption(label="Rank defs", value="rankdef",
+                                 description="(admin) define / update a rank"),
+            discord.SelectOption(label="Assign rank", value="rankset",
+                                 description="(admin) assign / remove rank to a player"),
+            discord.SelectOption(label="Ranks list", value="ranklist",
+                                 description="(admin) all ranks + assignments"),
+        ],
+    )
+    async def menu(self, interaction: discord.Interaction, select: discord.ui.Select):
+        handlers = {
+            "create": self.crear,
+            "setskin": self.skin,
+            "myskins": self.gallery,
+            "mycapes": self.capes,
+            "uploadskin": self.upload,
+            "uploadcape": self.uploadcape,
+            "info": self.info,
+            "pickpet": self.pick_pet,
+            "rankdef": self.rankdef,
+            "rankset": self.rankset,
+            "ranklist": self.ranklist,
+        }
+        handler = handlers.get(select.values[0])
+        if handler is None:
+            await interaction.response.send_message("Unknown action.", ephemeral=True)
+            return
+        await handler(interaction, None)
+
 
 PANEL_EMBED = discord.Embed(
-    title="🪶 MiniFeather — Accounts, Skins, Capes & Ranks",
+    title="MiniFeather — Accounts, Skins, Capes & Ranks",
     description=(
         "Create your MiniFeather account (password-protected, linked to your Discord) "
         "and choose the skin & cape others will see in-game.\n\n"
@@ -2002,11 +2169,11 @@ class UploadSkinView(discord.ui.View):
         super().__init__(timeout=180)
         self.kind = kind  # 'skin' | 'cape'
 
-    @discord.ui.button(label="By URL", style=discord.ButtonStyle.blurple, emoji="🔗")
+    @discord.ui.button(label="By URL", style=discord.ButtonStyle.blurple)
     async def by_url(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(UploadSkinModal(self.kind))
 
-    @discord.ui.button(label="Attach file", style=discord.ButtonStyle.green, emoji="📎")
+    @discord.ui.button(label="Attach file", style=discord.ButtonStyle.green)
     async def attach(self, interaction: discord.Interaction, button: discord.ui.Button):
         _PENDING_UPLOADS[interaction.user.id] = {"ts": int(time.time()), "kind": self.kind}
         what = "cape" if self.kind == "cape" else "skin"
@@ -2015,6 +2182,87 @@ class UploadSkinView(discord.ui.View):
             "message or just attach it in this channel within 2 min) — "
             f"square or 2:1 PNG, 64–2048px. It will become your in-game {what}.",
             ephemeral=False)
+
+
+@tree.command(name="pet", description="Assign/remove the in-game pet of a player (accounts.json 'pet')")
+@app_commands.describe(
+    action="set=assign pet, list=see pets, remove=clear pet",
+    player="username or uuid of the player",
+    pet="pet key (see PET_VARIANTS): random / chorus / gyarados ...",
+)
+@app_commands.choices(action=[
+    app_commands.Choice(name="set", value="set"),
+    app_commands.Choice(name="remove", value="remove"),
+    app_commands.Choice(name="list", value="list"),
+])
+async def pet_cmd(interaction: discord.Interaction, action: str,
+                  player: str = "", pet: str = ""):
+    if not in_channel(interaction):
+        await interaction.response.send_message("Canal no autorizado.", ephemeral=True)
+        return
+    if not is_admin(interaction):
+        await interaction.response.send_message("No autorizado.", ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        if action == "list":
+            data, _sha = gh_download()
+            if data is None:
+                await fup(interaction, "Remote accounts.json corrupt.")
+                return
+            rows = [(k, (v or {}).get("pet", "random"))
+                    for k, v in sorted(data.get("players", {}).items()) if (v or {}).get("pet")]
+            if not rows:
+                await fup(interaction, "No pets assigned — everyone is on random.")
+                return
+            lines = ["**Pets assigned:**"] + [f"`{k}` → {v}" for k, v in rows]
+            await fup(interaction, "\n".join(lines))
+            return
+
+        key = (player or "").strip().lower()
+        if not key:
+            await fup(interaction, "Falta <player>.")
+            return
+        data, sha = gh_download()
+        if data is None:
+            await fup(interaction, "Remote accounts.json corrupt.")
+            return
+        players = data.setdefault("players", {})
+
+        if action == "remove":
+            if not players.get(key, {}).get("pet"):
+                await fup(interaction, f"`{key}` has no pet.")
+                return
+            entry = {k: v for k, v in players[key].items() if k != "pet"}
+            players[key] = entry
+            commit = gh_upload(data, sha, f"skinbot: pet remove {key}")
+            await fup(interaction, f"Pet removed from **{key}** (back to random).\n{commit}")
+            return
+
+        # set
+        pk = (pet or "").strip()
+        valid = {k for k, _l, _d in PET_VARIANTS}
+        if pk not in valid:
+            await fup(interaction,
+                      f"Pet `{pk}` doesn't exist.\nValid: {', '.join(sorted(valid))}")
+            return
+        entry = {k: v for k, v in players.get(key, {}).items() if k != "pet"}
+        label = next((l for k, l, _d in PET_VARIANTS if k == pk), pk)
+        if pk != "random":
+            entry["pet"] = pk
+        players[key] = entry
+        commit = gh_upload(data, sha, f"skinbot: pet {key} = {pk}")
+        await fup(interaction,
+                  f"Pet for **{key}** → {label} ᕙ(`▽´)ᕗ\n"
+                  f"Visible in-game in ≤5 min (after re-entering the world).\n{commit}")
+
+    except Exception as e:
+        warn("pet falló:", repr(e))
+        try:
+            await fup(interaction, f"Error: {e}")
+        except Exception:
+            pass
 
 
 @tree.command(name="panel", description="Panel de cuentas y skins de MiniFeather")
