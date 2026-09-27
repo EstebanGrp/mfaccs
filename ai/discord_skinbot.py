@@ -2093,7 +2093,7 @@ class PanelView(discord.ui.View):
     @discord.ui.select(
         placeholder="Menu — pick an action…",
         custom_id="mfsb:menu",
-        row=2,
+        row=3,
         min_values=1, max_values=1,
         options=[
             discord.SelectOption(label="Create account", value="create",
