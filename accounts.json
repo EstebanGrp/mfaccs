@@ -3,7 +3,8 @@
     "shusukegxe_": {
       "rank": "dev",
       "cape": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/capes/shusukegxe/20260918-232550.png",
-      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe/20260916-212035.png"
+      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe/20260916-212035.png",
+      "pet": "gyarados_shiny"
     },
     "nightrise": {
       "skin": "custom:mf_dev_nightrise"
@@ -67,22 +68,22 @@
       "shiny": true,
       "priorityBase": "eternus"
     },
-      "mfeternus": {
-        "label": "MFETERNUS",
-        "color": "#ff0000",
-        "bold": true,
-        "glow": true,
-        "shiny": true,
-        "priorityBase": "eternus"
-      },
-      "mftester": {
-        "label": "MFTESTER",
-        "color": "#00FFFF",
-        "bold": true,
-        "glow": true,
-        "shiny": true,
-        "priorityBase": "eternus"
-      },
+    "mfeternus": {
+      "label": "MFETERNUS",
+      "color": "#ff0000",
+      "bold": true,
+      "glow": true,
+      "shiny": true,
+      "priorityBase": "eternus"
+    },
+    "mftester": {
+      "label": "MFTESTER",
+      "color": "#00FFFF",
+      "bold": true,
+      "glow": true,
+      "shiny": true,
+      "priorityBase": "eternus"
+    },
     "owner": {
       "label": "MFOWNER",
       "color": "#FFD700",
