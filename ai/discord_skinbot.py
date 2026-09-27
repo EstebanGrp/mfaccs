@@ -301,7 +301,7 @@ def gh_upload_png(user, png_bytes, kind="skin"):
     """Sube {skins|capes}/<user>/<ts>.png al repo publico (carpeta por
     usuario, versiones por timestamp — nunca se pisan). Devuelve la URL raw."""
     slug = skin_slug(user)
-    ts = time.strftime("%Y%m%d-%H%M%S")
+    ts = time.strftime("%Y%m%d-%H%M%S") + f"-{random.randint(1000, 9999)}"
     d, raw_base = asset_dirs(kind)
     path = f"{d}/{slug}/{ts}.png"
     payload = {
@@ -707,7 +707,11 @@ async def skin_cmd(interaction: discord.Interaction,
                 if key not in players:
                     await fup(interaction, f"No hay override para `{key}`.")
                     return
-                del players[key]
+                entry = {k: v for k, v in players[key].items() if k != "skin"}
+                if not entry:
+                    del players[key]
+                else:
+                    players[key] = entry
                 commit = gh_upload(data, sha, f"skinbot: remove {key}")
                 await fup(interaction, f"Quitado ({kdisp}).\n{commit}")
                 return
@@ -1224,7 +1228,7 @@ async def rank_cmd(interaction: discord.Interaction, action: str = "list",
             await fup(interaction, "Remote accounts.json corrupt.")
             return
         players = data.setdefault("players", {})
-        pk = player.strip()
+        pk = player.strip().lower()
         if action == "set":
             if not key:
                 await fup(interaction, "Falta <key> (rango a asignar).")
@@ -1298,7 +1302,7 @@ async def mfaccount_cmd(interaction: discord.Interaction,
             return
         if not USER_RE.match(username):
             await interaction.response.send_message(
-                "El usuario debe ser 3-16 chars [a-z0-9_].", ephemeral=True)
+                "El usuario debe ser 3-50 chars [a-z0-9_].", ephemeral=True)
             return
         if len(password) < 6:
             await interaction.response.send_message(
@@ -1321,7 +1325,13 @@ async def mfaccount_cmd(interaction: discord.Interaction,
             "created": int(time.time()),
             "creator": uid,
         }
-        save_local_accounts(data)
+        try:
+            save_local_accounts(data)
+        except Exception as e:
+            warn("mfaccount create: no se pudo guardar:", repr(e))
+            await interaction.response.send_message(
+                f"Could not save (accounts repo?): {e}", ephemeral=True)
+            return
         await interaction.response.send_message(
             f"Cuenta `{username}` creada y vinculada a {interaction.user.mention}. (・∀・)\n"
             "La contraseña vive hasheada (PBKDF2) solo en la PC del bot.", ephemeral=True)
@@ -1484,7 +1494,10 @@ class PetSelect(discord.ui.Select):
             players = data.setdefault("players", {})
             if key == "random":
                 entry = {k: v for k, v in players.get(self.user_key, {}).items() if k != "pet"}
-                players[self.user_key] = entry   # sin campo pet = random
+                if entry:
+                    players[self.user_key] = entry
+                else:
+                    players.pop(self.user_key, None)
                 label = "Random"
             else:
                 entry = {k: v for k, v in players.get(self.user_key, {}).items() if k != "pet"}
@@ -1790,7 +1803,7 @@ class RankPlayerModal(discord.ui.Modal, title="Assign / remove a rank"):
         if not is_admin(interaction):
             await interaction.response.send_message("Admin only.", ephemeral=True)
             return
-        pk = str(self.player.value).strip()
+        pk = str(self.player.value).strip().lower()
         rk = str(self.key.value or "").strip().lower()
         data, sha = gh_download()
         if data is None:
@@ -2235,7 +2248,10 @@ async def pet_cmd(interaction: discord.Interaction, action: str,
                 await fup(interaction, f"`{key}` has no pet.")
                 return
             entry = {k: v for k, v in players[key].items() if k != "pet"}
-            players[key] = entry
+            if entry:
+                players[key] = entry
+            else:
+                del players[key]
             commit = gh_upload(data, sha, f"skinbot: pet remove {key}")
             await fup(interaction, f"Pet removed from **{key}** (back to random).\n{commit}")
             return
@@ -2251,7 +2267,11 @@ async def pet_cmd(interaction: discord.Interaction, action: str,
         label = next((l for k, l, _d in PET_VARIANTS if k == pk), pk)
         if pk != "random":
             entry["pet"] = pk
-        players[key] = entry
+            players[key] = entry
+        elif entry:
+            players[key] = entry
+        else:
+            players.pop(key, None)
         commit = gh_upload(data, sha, f"skinbot: pet {key} = {pk}")
         await fup(interaction,
                   f"Pet for **{key}** → {label} ᕙ(`▽´)ᕗ\n"
