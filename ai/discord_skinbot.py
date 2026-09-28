@@ -9,20 +9,19 @@ import re
 import secrets
 import sys
 import time
-from collections import deque
 
 try:
     import discord
     from discord import app_commands
     from discord.ext import commands
 except ImportError:
-    print("[SkinBot] Falta discord.py  →  pip install discord.py")
+    print("minifeather falta discord.py  →  pip install discord.py")
     sys.exit(1)
 
 try:
     import requests
 except ImportError:
-    print("[SkinBot] Falta requests  →  pip install requests")
+    print("minifeather falta requests  →  pip install requests")
     sys.exit(1)
 
 TOKEN = os.environ.get("MFSB_TOKEN", "")
@@ -63,7 +62,7 @@ SKIN_RE = re.compile(r"^[a-z0-9_]+$", re.I)
 
 
 def warn(*a):
-    print("[SkinBot]", *a, file=sys.stderr)
+    print("minifeather", *a, file=sys.stderr)
 
 
 CONGRATS = [
@@ -318,7 +317,7 @@ def validate_skin_value(value):
 
 USER_RE = re.compile(r"^[a-z0-9_]{3,50}$", re.I)
 
-ACC_REPO = os.environ.get("MFSB_ACC_REPO", "")
+ACC_REPO = os.environ.get("MFSB_ACC_REPO", "")  # shusukegxe/mfaccounts-priv
 ACC_PATH = os.environ.get("MFSB_ACC_PATH", "mf_accounts.json")
 ACC_API = f"https://api.github.com/repos/{ACC_REPO}/contents/{ACC_PATH}" if ACC_REPO else ""
 REMOTE_ACC = bool(ACC_REPO)
@@ -472,119 +471,8 @@ async def on_ready():
 
     bot.add_view(PanelView())
     await tree.sync()
-    warn(f"SkinBot listo como {bot.user} — repo {REPO}@{BRANCH}")
+    warn(f"bot listo como {bot.user} — repo {REPO}@{BRANCH}")
     warn(f"canal autorizado: {CHANNEL_ID or '(todos)'} | admins: {len(ADMINS) or '(todos)'}")
-
-    bot.loop.create_task(ntfy_client_accounts_loop())
-
-
-NTFY_ACC_TOPIC = os.environ.get("MFSB_NTFY_ACC_TOPIC", "mf-accounts-req-v1")
-NTFY_SEEN_MAX = 500
-_ntfy_seen: deque = deque(maxlen=NTFY_SEEN_MAX)
-
-
-def is_valid_client_request(req):
-    """Valida la petición de creación que envía el client por ntfy."""
-    if not isinstance(req, dict) or req.get("type") != "mf_account_create":
-        return False, "formato"
-    username = str(req.get("username") or "")
-    if not USER_RE.match(username):
-        return False, "username"
-    if not isinstance(req.get("password"), str) or len(req["password"]) < 6 or len(req["password"]) > 64:
-        return False, "password"
-    if not isinstance(req.get("at"), (int, float)) or abs(time.time() - req["at"]) > 600:
-        return False, "timestamp"
-    return True, username
-
-
-async def handle_client_account_create(req):
-    """Crea la cuenta pedida desde el client y anuncia en el canal de log."""
-    ok, why = is_valid_client_request(req)
-    username = str(req.get("username") or "")
-    password = str(req.get("password") or "")
-    skin = str(req.get("skin") or "").strip() or None
-    if not ok:
-        warn(f"client create rechazada ({why}):", str(req)[:200])
-        return
-    data = load_local_accounts()
-    cuentas = data["cuentas"]
-    key = username.lower()
-    if key in cuentas:
-        warn(f"client create: {key} ya existe")
-        return
-    cuentas[key] = {
-        "hash": hash_password(password),
-        "discord_id": "",
-        "discord_tag": f"client:{req.get('client', '?')}",
-        "created": int(time.time()),
-        "creator": "client",
-        "source": "client",
-    }
-    try:
-        save_local_accounts(data)
-    except Exception as e:
-        warn("client create: no se pudo guardar:", repr(e))
-        return
-
-    if skin:
-        try:
-            ok_skin, _why = validate_skin_value(skin)
-            if ok_skin:
-                sdata, sha = gh_download()
-                if sdata is not None:
-                    players = sdata.setdefault("players", {})
-                    entry = {k: v for k, v in players.get(key, {}).items() if k != "skin"}
-                    entry["skin"] = skin
-                    players[key] = entry
-                    gh_upload(sdata, sha, f"skinbot: client create {key}")
-        except Exception as e:
-            warn("client create: skin inicial falló:", repr(e))
-    try:
-        ch = await log_channel()
-        if ch is not None:
-            await ch.send(f"Account **{username}** created from the MiniFeather Client")
-    except Exception as e:
-        warn("notify client create falló:", repr(e))
-    warn(f"client create OK: {key}")
-
-
-async def ntfy_client_accounts_loop():
-    """Suscripción WS al topic ntfy de peticiones del client.
-    El client manda el JSON plano (con la contraseña real dentro; ntfy
-    es público así que esto es SOLO para el ecosistema de confianza —
-    la contraseña llega hasheada a la DB, nunca en claro)."""
-    import asyncio
-    ws = None
-    backoff = 2
-    while not bot.is_closed():
-        try:
-            import asyncio
-            import websockets
-            uri = f"wss://ntfy.sh/{NTFY_ACC_TOPIC}/ws?since=30s"
-            async with websockets.connect(uri) as w:
-                ws = w
-                backoff = 2
-                async for raw in w:
-                    try:
-                        packet = json.loads(raw)
-                        if packet.get("event") != "message":
-                            continue
-                        mid = packet.get("id") or packet.get("time")
-                        if mid in _ntfy_seen:
-                            continue
-                        _ntfy_seen.append(mid)
-                        try:
-                            req = json.loads(packet.get("message") or "")
-                        except json.JSONDecodeError:
-                            continue
-                        await handle_client_account_create(req)
-                    except Exception as e:
-                        warn("ntfy msg error:", repr(e))
-        except Exception as e:
-            warn(f"ntfy ws error: {e!r} — reintento en {backoff}s")
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 60)
-
 
 @tree.command(name="skin", description="Administrar la DB de skins compartidas (accounts.json)")
 @app_commands.describe(
@@ -2246,10 +2134,10 @@ async def panel_cmd(interaction: discord.Interaction):
 
 def main():
     if not TOKEN:
-        print("[SkinBot] Falta MFSB_TOKEN (token del bot de Discord).")
+        print("minifeather falta MFSB_TOKEN (token del bot de Discord).")
         sys.exit(1)
     if not GH_TOKEN:
-        print("[SkinBot] Falta MFSB_GH_TOKEN (token de GitHub con contents:write).")
+        print("minifeather falta MFSB_GH_TOKEN (token de GitHub con contents:write).")
         sys.exit(1)
     warn(f"repo: {REPO}@{BRANCH} · path: {ACCOUNTS_PATH}")
     bot.run(TOKEN)
