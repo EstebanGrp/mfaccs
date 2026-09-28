@@ -2,8 +2,8 @@
   "players": {
     "shusukegxe_": {
       "rank": "dev",
-      "cape": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/capes/shusukegxe/20260918-232550.png",
-      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/shusukegxe/20260916-212035.png",
+      "cape": "https://raw.githubusercontent.com/shusukegxe/mfaccs/main/capes/shusukegxe/20260918-232550.png",
+      "skin": "https://raw.githubusercontent.com/shusukegxe/mfaccs/main/skins/shusukegxe/20260916-212035.png",
       "pet": "sculk"
     },
     "nightrise": {
@@ -23,7 +23,7 @@
       "rank": "dev"
     },
     "tsukyx": {
-      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/refs/heads/main/skins/tsukyx/7728def6a7cfab3e.png",
+      "skin": "https://raw.githubusercontent.com/shusukegxe/mfaccs/refs/heads/main/skins/tsukyx/7728def6a7cfab3e.png",
       "rank": "mftester",
       "pet": "chorus"
     },
@@ -32,7 +32,7 @@
       "rank": "mfeternus"
     },
     "not_senpai": {
-      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/not_senpai/20260916-212032.png"
+      "skin": "https://raw.githubusercontent.com/shusukegxe/mfaccs/main/skins/not_senpai/20260916-212032.png"
     },
     "Oo_PhongNguyen_oO": {
       "rank": "mfeternus"
@@ -41,15 +41,15 @@
       "rank": "owner"
     },
     "monstergames_studio": {
-      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/monstergames_studio/20260918-130806.png",
-      "cape": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/capes/monstergames_studio/20260919-073554.png"
+      "skin": "https://raw.githubusercontent.com/shusukegxe/mfaccs/main/skins/monstergames_studio/20260918-130806.png",
+      "cape": "https://raw.githubusercontent.com/shusukegxe/mfaccs/main/capes/monstergames_studio/20260919-073554.png"
     },
     "sonicowey7": {
       "skin": "vain"
     },
     "dacobsnek": {
-      "skin": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/skins/dacobsnek/20260925-041750.png",
-      "cape": "https://raw.githubusercontent.com/EstebanGrp/mfaccs/main/capes/dacobsnek/20260925-042218.png"
+      "skin": "https://raw.githubusercontent.com/shusukegxe/mfaccs/main/skins/dacobsnek/20260925-041750.png",
+      "cape": "https://raw.githubusercontent.com/shusukegxe/mfaccs/main/capes/dacobsnek/20260925-042218.png"
     }
   },
   "ranks": {
